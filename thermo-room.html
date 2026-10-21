@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>サーモスタットの部屋</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=JetBrains+Mono:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<style>
+/* Layout: room screen on top, charts strip, then controls | readout; stacks on phone */
+:root{
+  --bg:#e8edf0; --panel:#ffffff; --fg:#17212b; --muted:#5a6772; --line:#cfd8de;
+  --room:#f4f7f9; --room2:#e3ebf0; --grid:rgba(23,33,43,.07);
+  --wall:#3b4752; --piston:#7b8792; --ground:#5e8a4e; --ground2:#456f38;
+  --hero:#2a6fbd; --target:#cf3f35; --line1:#2a6fbd; --line2:#b97f08;
+  --btn:#f2f5f7; --btn-on:#17212b; --btn-on-fg:#ffffff;
+  --f-display:"DotGothic16","Zen Kaku Gothic New",system-ui,sans-serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f151b; --panel:#17202a; --fg:#e4ebf0; --muted:#93a2ae; --line:#2b3845;
+  --room:#141d26; --room2:#1b2733; --grid:rgba(228,235,240,.06);
+  --wall:#a9b6c1; --piston:#5d6b78; --ground:#3f6a35; --ground2:#2d5026;
+  --hero:#5ea2ef; --target:#f0675c; --line1:#5ea2ef; --line2:#e8b43a;
+  --btn:#202b37; --btn-on:#e4ebf0; --btn-on-fg:#0f151b; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0f151b; --panel:#17202a; --fg:#e4ebf0; --muted:#93a2ae; --line:#2b3845;
+  --room:#141d26; --room2:#1b2733; --grid:rgba(228,235,240,.06);
+  --wall:#a9b6c1; --piston:#5d6b78; --ground:#3f6a35; --ground2:#2d5026;
+  --hero:#5ea2ef; --target:#f0675c; --line1:#5ea2ef; --line2:#e8b43a;
+  --btn:#202b37; --btn-on:#e4ebf0; --btn-on-fg:#0f151b; color-scheme:dark;}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--f-body);font-size:15px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 32px}
+.wrap{max-width:1080px;margin:0 auto;display:grid;gap:16px}
+.steps{display:flex;flex-wrap:wrap;gap:6px;font-size:13px}
+.steps a{color:var(--muted);text-decoration:none;padding:2px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel)}
+.steps a:hover{border-color:var(--fg);color:var(--fg)}
+.steps a[aria-current]{color:var(--btn-on-fg);background:var(--btn-on);border-color:var(--btn-on)}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 16px}
+h1{font-family:var(--f-display);font-weight:400;font-size:clamp(24px,4vw,34px);margin:0;letter-spacing:.02em}
+header p{margin:0;color:var(--muted)}
+.screen{position:relative;border:2px solid var(--fg);border-radius:6px;overflow:hidden;background:var(--room)}
+#cv{display:block;width:100%;aspect-ratio:16/8.4;max-width:100%;touch-action:none}
+.hint{position:absolute;left:10px;top:8px;font-family:var(--f-display);font-size:13px;opacity:.7;pointer-events:none}
+.badge{position:absolute;right:10px;top:8px;font-family:var(--f-display);font-size:16px;padding:2px 10px;border:2px solid var(--fg);border-radius:4px;background:var(--panel)}
+.pad{display:flex;gap:8px;justify-content:center}
+.pad button{font-family:var(--f-display);font-size:18px;min-width:64px;padding:10px 14px}
+.charts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+@media (max-width:860px){.charts{grid-template-columns:minmax(0,1fr)}}
+.chart{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-width:0}
+.chart canvas{display:block;width:100%;height:120px}
+.chart .head{display:flex;justify-content:space-between;gap:8px;font-size:13px}
+.chart .head b{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px}
+@media (max-width:760px){.grid{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;display:grid;gap:14px;min-width:0;align-content:start}
+.label{font-size:12px;letter-spacing:.08em;color:var(--muted);font-weight:700;margin-bottom:4px}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+button{font-family:var(--f-body);font-size:14px;font-weight:700;color:var(--fg);background:var(--btn);border:1px solid var(--line);border-radius:6px;padding:8px 12px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--fg)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button:focus-visible,input:focus-visible{outline:2px solid var(--hero);outline-offset:2px}
+button[aria-pressed="true"]{background:var(--btn-on);color:var(--btn-on-fg);border-color:var(--btn-on)}
+.slider{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;align-items:center}
+.slider label{font-weight:700}
+.slider output{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:14px}
+.slider input{grid-column:1/-1;width:100%}
+.slider.off{opacity:.4}
+dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 16px;margin:0}
+dt{color:var(--muted);font-size:13px}
+dd{margin:0;text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.explain{font-size:13.5px;margin:0;padding:10px 12px;border-left:3px solid var(--hero);background:var(--room2);border-radius:0 6px 6px 0}
+.explain code{font-family:var(--f-mono);font-size:12.5px}
+</style>
+
+<div class="wrap">
+  <nav class="steps" aria-label="講義の段階"><a href="index.html">講義の流れ</a><a href="lj-box.html#force">1 力場</a><a href="jump-integrator.html">2 時間積分</a><a href="thermo-room.html" aria-current="page">3 温度・圧力</a><a href="lj-box.html#props">4 物性へ</a><a href="molecule.html">＋ 小分子</a><a href="polymer.html">＋ 高分子</a></nav>
+  <header>
+    <h1>サーモスタットの部屋</h1>
+    <p>ボール＝気体分子。キャラを動かしながら NVE / NVT / NPT を切り替える。</p>
+  </header>
+
+  <div class="screen">
+    <canvas id="cv" tabindex="0" aria-label="部屋の画面。矢印キーで移動、スペースでジャンプ"></canvas>
+    <div class="hint">← → 移動 ／ Space ジャンプ</div>
+    <div class="badge" id="badge">NVT</div>
+  </div>
+  <div class="pad" aria-label="タッチ操作">
+    <button id="bL" aria-label="左へ移動">◀</button>
+    <button id="bJ" aria-label="ジャンプ">JUMP</button>
+    <button id="bR" aria-label="右へ移動">▶</button>
+  </div>
+
+  <div class="charts">
+    <div class="chart">
+      <div class="head"><span>温度 T（ボールの平均運動エネルギー）</span><b id="hT"></b></div>
+      <canvas id="chT"></canvas>
+    </div>
+    <div class="chart">
+      <div class="head"><span>部屋の体積 V（面積）</span><b id="hV"></b></div>
+      <canvas id="chV"></canvas>
+    </div>
+    <div class="chart">
+      <div class="head"><span>圧力 P（天井が受ける力 ÷ 幅）</span><b id="hP"></b></div>
+      <canvas id="chP"></canvas>
+    </div>
+  </div>
+
+  <div class="grid">
+    <section class="card" aria-label="設定">
+      <div>
+        <div class="label">アンサンブル</div>
+        <div class="seg" id="ensSeg">
+          <button data-e="NVE">NVE（何もしない）</button>
+          <button data-e="NVT">NVT（温度一定）</button>
+          <button data-e="NPT">NPT（温度＋圧力一定）</button>
+        </div>
+      </div>
+      <div>
+        <div class="label">サーモスタット</div>
+        <div class="seg" id="thSeg">
+          <button data-t="rescale">速度スケーリング</button>
+          <button data-t="berendsen">Berendsen</button>
+          <button data-t="langevin">Langevin</button>
+          <button data-t="nh">Nosé–Hoover</button>
+        </div>
+      </div>
+      <div class="slider" id="wT">
+        <label for="sT">目標温度 T₀</label><output id="oT"></output>
+        <input type="range" id="sT" min="0.5" max="15" step="0.1" value="4">
+      </div>
+      <div class="slider" id="wP">
+        <label for="sP">目標圧力 P₀（天井の重り）</label><output id="oP"></output>
+        <input type="range" id="sP" min="1" max="10" step="0.1" value="3">
+      </div>
+      <div class="slider">
+        <label for="sN">ボールの数 N</label><output id="oN"></output>
+        <input type="range" id="sN" min="10" max="140" step="1" value="70">
+      </div>
+      <div class="seg">
+        <button id="bHide" aria-pressed="false">ボールを消して Langevin</button>
+        <button id="bReset">リセット</button>
+      </div>
+    </section>
+
+    <section class="card" aria-label="測定値と説明">
+      <dl>
+        <dt>温度 T</dt><dd id="rT"></dd>
+        <dt>圧力 P（天井が受ける力）</dt><dd id="rP"></dd>
+        <dt>体積 V</dt><dd id="rV"></dd>
+        <dt>理想気体チェック PV / NT</dt><dd id="rI"></dd>
+        <dt>Nosé–Hoover の摩擦 ξ</dt><dd id="rX"></dd>
+      </dl>
+      <p class="explain" id="explain"></p>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ---------- parameters (reduced units: m_ball = 1, k_B = 1) ----------
+  const W = 16, HMAX = 7.9, H_FIXED = 5, R = 0.15, SIZE = 0.8;
+  const M_HERO = 20, M_PISTON = 40, G = 9.8, V0 = 7;
+  const DT = 1 / 240;
+  const P = { ens: 'NVT', th: 'berendsen', T0: 4, P0: 3, N: 70, hide: false };
+  const TAU_B = 0.8, GAMMA = 1.0, TAU_NH = 0.6, GAMMA_HERO = 3;
+
+  const EXPLAIN = {
+    NVE: 'サーモスタットなし。キャラが走ると<b>ボールが温まる</b>。止まると床の摩擦で少しずつ<b>冷えていく</b>。→ 温度を保つには何か必要。',
+    rescale: '毎ステップ、全ボールの速さを <code>×√(T₀/T)</code> して温度を<b>強制的に</b>そろえる。グラフが平らすぎる＝揺らぎが消える（正しいNVTではない）。',
+    berendsen: '<code>λ = √(1 + Δt/τ·(T₀/T − 1))</code> で<b>じわじわ</b>目標へ近づける。安定だが揺らぎは小さめ。',
+    langevin: 'ボール1個1個に <b>抵抗 −γv ＋ ランダムな押し</b>。見えない「周りの分子」にぶつかられているイメージ。',
+    nh: '摩擦 ξ が<b>自動で変わる</b>：熱すぎると ξ↑（ブレーキ）、冷たすぎると ξ↓（マイナス＝加速）。温度がゆっくり振動する。',
+    hide: 'ボールを消して、キャラに直接 <b>抵抗＋ランダムな力</b>（Langevin）。ボールにぶつかられていた時の<b>フラフラ</b>と比べてみよう。',
+    npt: '天井は<b>重りの乗ったピストン</b>。ボールが押す力と重り P₀ がつり合う高さで止まる。温度を上げると<b>部屋がふくらむ</b>。'
+  };
+
+  // ---------- state ----------
+  let balls = [], hero, H, vp = 0, xi = 0, simT = 0;
+  let impulseAcc = 0, Psm = 0;
+  const histT = [], histV = [], histP = [];
+  const keys = { L: false, R: false }; let jumpQueued = false;
+
+  function gauss() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+  function makeBalls(n) {
+    const arr = []; let tries = 0;
+    while (arr.length < n && tries < 20000) {
+      tries++;
+      const x = R + Math.random() * (W - 2 * R), y = R + Math.random() * (H - 2 * R);
+      if (x > hero.x - R && x < hero.x + SIZE + R && y < hero.y + SIZE + R) continue;
+      if (arr.some(b => (b.x - x) ** 2 + (b.y - y) ** 2 < (2.2 * R) ** 2)) continue;
+      const s = Math.sqrt(P.T0);
+      arr.push({ x, y, vx: gauss() * s, vy: gauss() * s });
+    }
+    return arr;
+  }
+  function reset() {
+    H = P.ens === 'NPT' ? Math.min(HMAX, Math.max(2, P.N * P.T0 / (P.P0 * W))) : H_FIXED;
+    vp = 0; xi = 0; Psm = P.N * P.T0 / (W * H); impulseAcc = 0;
+    hero = { x: 1, y: 0, vx: 0, vy: 0, onGround: true, face: 1 };
+    balls = makeBalls(P.N);
+    histT.length = 0; histV.length = 0; histP.length = 0;
+  }
+  function adjustN() {
+    while (balls.length > P.N) balls.pop();
+    if (balls.length < P.N) { const save = balls; balls = save.concat(makeBalls(P.N - save.length).filter(nb =>
+      !save.some(b => (b.x - nb.x) ** 2 + (b.y - nb.y) ** 2 < (2.2 * R) ** 2))); }
+  }
+
+  function temperature() {
+    if (!balls.length) return 0;
+    let k = 0; for (const b of balls) k += b.vx * b.vx + b.vy * b.vy;
+    return 0.5 * k / balls.length; // 2D: <½mv²> = kT
+  }
+
+  // ---------- physics ----------
+  function heroStep(dt) {
+    const input = (keys.R ? 1 : 0) - (keys.L ? 1 : 0);
+    if (jumpQueued && hero.onGround) { hero.vy = V0; hero.onGround = false; }
+    jumpQueued = false;
+    const fr = input ? 6 : 1.5;
+    const ax = hero.onGround ? input * 30 - fr * hero.vx : input * 12;
+    const ay = hero.onGround ? 0 : -G;
+    // velocity Verlet (accel is velocity-independent in y)
+    hero.x += hero.vx * dt + 0.5 * ax * dt * dt;
+    hero.y += hero.vy * dt + 0.5 * ay * dt * dt;
+    hero.vx += ax * dt; hero.vy += ay * dt;
+    if (P.hide && P.ens !== 'NVE') {
+      const s = Math.sqrt(2 * GAMMA_HERO * P.T0 / M_HERO * dt);
+      hero.vx += -GAMMA_HERO * hero.vx * dt + s * gauss();
+      if (!hero.onGround) hero.vy += -GAMMA_HERO * hero.vy * dt + s * gauss();
+    }
+    if (hero.x < 0) { hero.x = 0; hero.vx = Math.abs(hero.vx) * 0.3; }
+    if (hero.x > W - SIZE) { hero.x = W - SIZE; hero.vx = -Math.abs(hero.vx) * 0.3; }
+    if (hero.y <= 0 && !hero.onGround) { hero.y = 0; hero.vy = 0; hero.onGround = true; }
+    if (hero.y + SIZE > H) {
+      hero.y = H - SIZE;
+      if (hero.vy > vp) {
+        if (P.ens === 'NPT') {
+          const v1 = hero.vy, m1 = M_HERO, m2 = M_PISTON;
+          hero.vy = ((m1 - m2) * v1 + 2 * m2 * vp) / (m1 + m2);
+          vp = ((m2 - m1) * vp + 2 * m1 * v1) / (m1 + m2);
+        } else hero.vy = -Math.abs(hero.vy);
+      }
+    }
+    if (Math.abs(hero.vx) > 0.1) hero.face = Math.sign(hero.vx);
+  }
+
+  function ballStep(dt) {
+    let imp = 0;
+    for (const b of balls) {
+      b.x += b.vx * dt; b.y += b.vy * dt;
+      if (b.x < R) { b.x = R; b.vx = Math.abs(b.vx); }
+      if (b.x > W - R) { b.x = W - R; b.vx = -Math.abs(b.vx); }
+      if (b.y < R) { b.y = R; b.vy = Math.abs(b.vy); }
+      if (b.y > H - R) {
+        b.y = H - R;
+        if (b.vy > vp) {
+          if (P.ens === 'NPT') {
+            const v1 = b.vy, m2 = M_PISTON;
+            b.vy = ((1 - m2) * v1 + 2 * m2 * vp) / (1 + m2);
+            vp = ((m2 - 1) * vp + 2 * v1) / (1 + m2);
+            imp += v1 - b.vy;
+          } else { imp += 2 * b.vy; b.vy = -b.vy; }
+        }
+      }
+      // ball ↔ hero (box)
+      const qx = Math.max(hero.x, Math.min(b.x, hero.x + SIZE));
+      const qy = Math.max(hero.y, Math.min(b.y, hero.y + SIZE));
+      let dx = b.x - qx, dy = b.y - qy, d2 = dx * dx + dy * dy;
+      if (d2 < R * R) {
+        let d = Math.sqrt(d2), nx, ny;
+        if (d < 1e-9) { nx = 0; ny = 1; d = 0; } else { nx = dx / d; ny = dy / d; }
+        b.x = qx + nx * R; b.y = qy + ny * R;
+        const vr = (b.vx - hero.vx) * nx + (b.vy - hero.vy) * ny;
+        if (vr < 0) {
+          const J = -2 * vr / (1 + 1 / M_HERO);
+          b.vx += J * nx; b.vy += J * ny;
+          hero.vx -= J * nx / M_HERO;
+          if (!(hero.onGround && ny > 0)) hero.vy -= J * ny / M_HERO;
+        }
+      }
+    }
+    // ball ↔ ball (equal-mass hard disks)
+    const n = balls.length, D = 2 * R, D2 = D * D;
+    for (let i = 0; i < n; i++) {
+      const a = balls[i];
+      for (let j = i + 1; j < n; j++) {
+        const c = balls[j], dx = c.x - a.x;
+        if (dx > D || dx < -D) continue;
+        const dy = c.y - a.y, d2 = dx * dx + dy * dy;
+        if (d2 < D2 && d2 > 1e-12) {
+          const d = Math.sqrt(d2), nx = dx / d, ny = dy / d;
+          const vr = (c.vx - a.vx) * nx + (c.vy - a.vy) * ny;
+          if (vr < 0) { a.vx += vr * nx; a.vy += vr * ny; c.vx -= vr * nx; c.vy -= vr * ny; }
+          const ov = (D - d) / 2; a.x -= nx * ov; a.y -= ny * ov; c.x += nx * ov; c.y += ny * ov;
+        }
+      }
+    }
+    return imp;
+  }
+
+  function thermostat(dt) {
+    if (P.ens === 'NVE' || P.hide || !balls.length) return;
+    const T = temperature();
+    if (T <= 1e-9) return;
+    if (P.th === 'rescale') {
+      const l = Math.sqrt(P.T0 / T); for (const b of balls) { b.vx *= l; b.vy *= l; }
+    } else if (P.th === 'berendsen') {
+      const l = Math.sqrt(Math.max(0, 1 + dt / TAU_B * (P.T0 / T - 1)));
+      for (const b of balls) { b.vx *= l; b.vy *= l; }
+    } else if (P.th === 'langevin') {
+      const s = Math.sqrt(2 * GAMMA * P.T0 * dt), f = 1 - GAMMA * dt;
+      for (const b of balls) { b.vx = b.vx * f + s * gauss(); b.vy = b.vy * f + s * gauss(); }
+    } else if (P.th === 'nh') {
+      xi += dt * (T / P.T0 - 1) / (TAU_NH * TAU_NH);
+      const f = 1 - xi * dt; for (const b of balls) { b.vx *= f; b.vy *= f; }
+    }
+  }
+
+  function piston(dt) {
+    if (P.ens !== 'NPT') { vp = 0; return; }
+    vp += (-P.P0 * W / M_PISTON) * dt;
+    vp *= 1 - 1.2 * dt;
+    H += vp * dt;
+    const Hmin = SIZE + 0.5;
+    if (H < Hmin) { H = Hmin; vp = Math.max(0, vp); }
+    if (H > HMAX) { H = HMAX; vp = Math.min(0, vp); }
+  }
+
+  function physics(dt) {
+    heroStep(dt);
+    piston(dt);
+    if (!P.hide) { impulseAcc += ballStep(dt); thermostat(dt); }
+    simT += dt;
+  }
+
+  // ---------- loop ----------
+  let acc = 0, last = performance.now(), lastSample = 0, lastUI = 0;
+  function frame(now) {
+    const real = Math.min(0.05, (now - last) / 1000); last = now;
+    acc += real;
+    while (acc >= DT) { physics(DT); acc -= DT; }
+    if (simT - lastSample >= 0.1) {
+      const span = simT - lastSample; lastSample = simT;
+      const Pinst = impulseAcc / (span * W); impulseAcc = 0;
+      Psm += (Pinst - Psm) * Math.min(1, span / 1.0);
+      histT.push(P.hide ? NaN : temperature()); histV.push(W * H); histP.push(P.hide ? NaN : Psm);
+      if (histT.length > 200) { histT.shift(); histV.shift(); histP.shift(); }
+    }
+    draw();
+    if (now - lastUI > 150) { updateUI(); drawCharts(); lastUI = now; }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- drawing ----------
+  const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  let cw = 0, ch = 0, S = 1;
+  const FLOOR = 0.35;
+  function fit(c, g) {
+    const r = c.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr);
+    g.setTransform(dpr, 0, 0, dpr, 0, 0); return r;
+  }
+  new ResizeObserver(() => { const r = fit(cv, ctx); cw = r.width; ch = r.height; S = cw / W; }).observe(cv);
+
+  let C = {};
+  function readColors() {
+    const cs = getComputedStyle(document.documentElement);
+    for (const k of ['room','room2','grid','wall','piston','ground','ground2','hero','target','line1','line2','fg','muted','panel'])
+      C[k] = cs.getPropertyValue('--' + k).trim();
+  }
+  readColors();
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+  new MutationObserver(readColors).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  const X = x => x * S, Y = y => ch - (y + FLOOR) * S;
+
+  function draw() {
+    if (!cw) return;
+    ctx.fillStyle = C.room2; ctx.fillRect(0, 0, cw, ch);
+    // inside of room
+    ctx.fillStyle = C.room; ctx.fillRect(0, Y(H), cw, H * S);
+    ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
+    for (let m = 1; m < W; m++) { const x = Math.round(X(m)) + .5; ctx.beginPath(); ctx.moveTo(x, Y(H)); ctx.lineTo(x, Y(0)); ctx.stroke(); }
+    for (let m = 1; m < H; m++) { const y = Math.round(Y(m)) + .5; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cw, y); ctx.stroke(); }
+    // floor
+    ctx.fillStyle = C.ground; ctx.fillRect(0, Y(0), cw, FLOOR * S);
+    ctx.fillStyle = C.ground2; ctx.fillRect(0, Y(0), cw, Math.max(3, S * .1));
+    // ceiling / piston
+    const ct = Y(H) - Math.max(8, S * 0.25);
+    ctx.fillStyle = P.ens === 'NPT' ? C.piston : C.wall;
+    ctx.fillRect(0, ct, cw, Y(H) - ct);
+    if (P.ens === 'NPT') {
+      // weight block proportional to P0
+      const bw = S * (1.2 + P.P0 * 0.25), bh = S * (0.25 + P.P0 * 0.07);
+      ctx.fillStyle = C.wall; ctx.fillRect(cw / 2 - bw / 2, ct - bh, bw, bh);
+      ctx.fillStyle = C.panel; ctx.font = '600 ' + Math.max(11, S * .3) + 'px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('P₀ = ' + P.P0.toFixed(1), cw / 2, ct - bh / 2);
+      ctx.textAlign = 'left';
+    }
+    // balls, colored by speed
+    if (!P.hide) {
+      const vref = Math.sqrt(2 * Math.max(P.T0, 0.5)) * 1.6;
+      for (const b of balls) {
+        const sp = Math.hypot(b.vx, b.vy), t = Math.min(1, sp / vref);
+        ctx.fillStyle = `hsl(${215 - 215 * t} 75% 52%)`;
+        ctx.beginPath(); ctx.arc(X(b.x), Y(b.y), R * S, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    drawHero();
+  }
+  function drawHero() {
+    const x = X(hero.x), y = Y(hero.y + SIZE), w = SIZE * S, h = SIZE * S;
+    ctx.fillStyle = C.hero; ctx.strokeStyle = C.fg; ctx.lineWidth = Math.max(1.5, S * .04);
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, w * .28); ctx.fill(); ctx.stroke();
+    const ex = x + w * (hero.face > 0 ? .58 : .22), ey = y + h * .32;
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(ex, ey, w * .14, h * .24); ctx.fillRect(ex + w * .2, ey, w * .14, h * .24);
+    ctx.fillStyle = '#111111'; const px = hero.face > 0 ? w * .06 : 0, py = hero.vy > .5 ? 0 : h * .1;
+    ctx.fillRect(ex + px, ey + py, w * .08, h * .12); ctx.fillRect(ex + w * .2 + px, ey + py, w * .08, h * .12);
+  }
+
+  // charts
+  const chT = document.getElementById('chT'), gT = chT.getContext('2d');
+  const chV = document.getElementById('chV'), gV = chV.getContext('2d');
+  const chP = document.getElementById('chP'), gP = chP.getContext('2d');
+  let rT = { width: 0, height: 0 }, rV = { width: 0, height: 0 }, rP = { width: 0, height: 0 };
+  new ResizeObserver(() => { rT = fit(chT, gT); rV = fit(chV, gV); rP = fit(chP, gP); drawCharts(); }).observe(chT);
+  function lineChart(g, r, data, target, color, ymax, unit) {
+    const w = r.width, h = r.height; if (!w) return;
+    g.clearRect(0, 0, w, h);
+    const L = 34, B = 16, T = 6;
+    const yv = v => T + (h - T - B) * (1 - v / ymax);
+    g.strokeStyle = C.grid; g.fillStyle = C.muted; g.lineWidth = 1;
+    g.font = '11px "JetBrains Mono", monospace'; g.textBaseline = 'middle'; g.textAlign = 'right';
+    for (let i = 0; i <= 4; i++) {
+      const v = ymax * i / 4, y = Math.round(yv(v)) + .5;
+      g.beginPath(); g.moveTo(L, y); g.lineTo(w, y); g.stroke();
+      g.fillText(v.toFixed(ymax >= 20 ? 0 : 1), L - 4, y);
+    }
+    g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+    g.fillText('過去 20 s', L + 2, h - 3);
+    if (target !== null) {
+      g.save(); g.setLineDash([5, 4]); g.strokeStyle = C.target; g.lineWidth = 1.5;
+      const y = yv(target); g.beginPath(); g.moveTo(L, y); g.lineTo(w, y); g.stroke(); g.restore();
+    }
+    g.strokeStyle = color; g.lineWidth = 2; g.beginPath();
+    let started = false;
+    data.forEach((v, i) => {
+      if (!isFinite(v)) { started = false; return; }
+      const x = L + (w - L) * i / 199, y = yv(Math.min(v, ymax));
+      if (!started) { g.moveTo(x, y); started = true; } else g.lineTo(x, y);
+    });
+    g.stroke();
+  }
+  function drawCharts() {
+    const tmax = Math.max(5, Math.ceil(Math.max(P.T0 * 1.6, ...histT.filter(isFinite), 1) / 5) * 5);
+    lineChart(gT, rT, histT, P.ens === 'NVE' ? null : P.T0, C.line1, tmax);
+    lineChart(gV, rV, histV, null, C.line2, W * 8);
+    const pmax = Math.max(5, Math.ceil(Math.max(P.ens === 'NPT' ? P.P0 * 1.6 : 0, ...histP.filter(isFinite), 1) / 5) * 5);
+    lineChart(gP, rP, histP, P.ens === 'NPT' ? P.P0 : null, C.target, pmax);
+  }
+
+  // ---------- UI ----------
+  const $ = id => document.getElementById(id);
+  function updateUI() {
+    const T = temperature(), V = W * H;
+    $('rT').textContent = P.hide ? '—' : T.toFixed(2);
+    $('rP').textContent = P.hide ? '—' : Psm.toFixed(2);
+    $('rV').textContent = V.toFixed(1);
+    $('rI').textContent = P.hide || !balls.length || T < .01 ? '—' : (Psm * V / (balls.length * T)).toFixed(2);
+    $('rX').textContent = P.th === 'nh' && P.ens !== 'NVE' && !P.hide ? xi.toFixed(2) : '—';
+    $('hT').textContent = P.hide ? '—' : 'T = ' + T.toFixed(2);
+    $('hV').textContent = 'V = ' + V.toFixed(1);
+    $('hP').textContent = P.hide ? '—' : 'P = ' + Psm.toFixed(2);
+  }
+  function syncUI() {
+    $('oT').textContent = P.T0.toFixed(1); $('oP').textContent = P.P0.toFixed(1); $('oN').textContent = P.N;
+    document.querySelectorAll('#ensSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.e === P.ens)));
+    document.querySelectorAll('#thSeg button').forEach(b => {
+      b.setAttribute('aria-pressed', String(b.dataset.t === P.th && P.ens !== 'NVE'));
+      b.disabled = P.ens === 'NVE' || P.hide;
+    });
+    $('wT').classList.toggle('off', P.ens === 'NVE');
+    $('wP').classList.toggle('off', P.ens !== 'NPT');
+    $('sP').disabled = P.ens !== 'NPT'; $('sT').disabled = P.ens === 'NVE';
+    $('bHide').setAttribute('aria-pressed', String(P.hide)); $('bHide').disabled = P.ens === 'NVE';
+    $('badge').textContent = P.ens + (P.ens !== 'NVE' ? ' · ' + (P.hide ? 'Langevin（キャラ）' : $('thSeg').querySelector(`[data-t="${P.th}"]`).textContent) : '');
+    let ex = P.ens === 'NVE' ? EXPLAIN.NVE : P.hide ? EXPLAIN.hide : EXPLAIN[P.th];
+    if (P.ens === 'NPT') ex += '<br>' + EXPLAIN.npt;
+    $('explain').innerHTML = ex;
+  }
+  document.querySelectorAll('#ensSeg button').forEach(b => b.addEventListener('click', () => {
+    P.ens = b.dataset.e; if (P.ens === 'NVE') P.hide = false; vp = 0; xi = 0;
+    if (P.ens !== 'NPT' && Math.abs(H - H_FIXED) > 1e-6) { H = H_FIXED; for (const q of balls) if (q.y > H - R) q.y = H - R - Math.random() * .3; }
+    syncUI();
+  }));
+  document.querySelectorAll('#thSeg button').forEach(b => b.addEventListener('click', () => { P.th = b.dataset.t; xi = 0; syncUI(); }));
+  $('sT').addEventListener('input', e => { P.T0 = +e.target.value; syncUI(); });
+  $('sP').addEventListener('input', e => { P.P0 = +e.target.value; syncUI(); });
+  $('sN').addEventListener('input', e => { P.N = +e.target.value; adjustN(); syncUI(); });
+  $('bHide').addEventListener('click', () => { P.hide = !P.hide; syncUI(); });
+  $('bReset').addEventListener('click', () => { reset(); syncUI(); });
+
+  addEventListener('keydown', e => {
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (tag === 'INPUT' && e.key.startsWith('Arrow')) return;
+    if (e.key === 'ArrowLeft' || e.key === 'a') { keys.L = true; e.preventDefault(); }
+    else if (e.key === 'ArrowRight' || e.key === 'd') { keys.R = true; e.preventDefault(); }
+    else if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w') {
+      if (tag === 'BUTTON' && e.key === ' ') return;
+      if (!e.repeat) jumpQueued = true; e.preventDefault();
+    }
+  });
+  addEventListener('keyup', e => {
+    if (e.key === 'ArrowLeft' || e.key === 'a') keys.L = false;
+    if (e.key === 'ArrowRight' || e.key === 'd') keys.R = false;
+  });
+  function hold(id, k) {
+    const el = $(id);
+    el.addEventListener('pointerdown', e => { keys[k] = true; el.setPointerCapture(e.pointerId); });
+    for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) el.addEventListener(t, () => keys[k] = false);
+  }
+  hold('bL', 'L'); hold('bR', 'R');
+  $('bJ').addEventListener('pointerdown', () => { jumpQueued = true; });
+  cv.addEventListener('pointerdown', () => { cv.focus(); jumpQueued = true; });
+
+  reset(); syncUI();
+  requestAnimationFrame(frame);
+})();
+</script>
+
+</html>

@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>高分子の鎖</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=JetBrains+Mono:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<style>
+/* Layout: box screen on top, 2×2 charts, then force-field card | temperature & tools card | readout; stacks on phone */
+:root{
+  --bg:#e8edf0; --panel:#ffffff; --fg:#17212b; --muted:#5a6772; --line:#cfd8de;
+  --room:#f4f7f9; --room2:#e3ebf0; --grid:rgba(23,33,43,.07); --bond:#5a6772;
+  --wall:#3b4752; --hero:#2a6fbd; --target:#cf3f35; --line1:#2a6fbd; --line2:#b97f08; --prev:#a6b2bc;
+  --btn:#f2f5f7; --btn-on:#17212b; --btn-on-fg:#ffffff;
+  --f-display:"DotGothic16","Zen Kaku Gothic New",system-ui,sans-serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f151b; --panel:#17202a; --fg:#e4ebf0; --muted:#93a2ae; --line:#2b3845;
+  --room:#141d26; --room2:#1b2733; --grid:rgba(228,235,240,.06); --bond:#93a2ae;
+  --wall:#a9b6c1; --hero:#5ea2ef; --target:#f0675c; --line1:#5ea2ef; --line2:#e8b43a; --prev:#4a5866;
+  --btn:#202b37; --btn-on:#e4ebf0; --btn-on-fg:#0f151b; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0f151b; --panel:#17202a; --fg:#e4ebf0; --muted:#93a2ae; --line:#2b3845;
+  --room:#141d26; --room2:#1b2733; --grid:rgba(228,235,240,.06); --bond:#93a2ae;
+  --wall:#a9b6c1; --hero:#5ea2ef; --target:#f0675c; --line1:#5ea2ef; --line2:#e8b43a; --prev:#4a5866;
+  --btn:#202b37; --btn-on:#e4ebf0; --btn-on-fg:#0f151b; color-scheme:dark;}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--f-body);font-size:15px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 32px}
+.wrap{max-width:1080px;margin:0 auto;display:grid;gap:16px}
+.steps{display:flex;flex-wrap:wrap;gap:6px;font-size:13px}
+.steps a{color:var(--muted);text-decoration:none;padding:2px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel)}
+.steps a:hover{border-color:var(--fg);color:var(--fg)}
+.steps a[aria-current]{color:var(--btn-on-fg);background:var(--btn-on);border-color:var(--btn-on)}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 16px}
+h1{font-family:var(--f-display);font-weight:400;font-size:clamp(24px,4vw,34px);margin:0;letter-spacing:.02em}
+header p{margin:0;color:var(--muted)}
+.screen{position:relative;border:2px solid var(--fg);border-radius:6px;overflow:hidden;background:var(--room)}
+#cv{display:block;width:100%;aspect-ratio:20/10.5;max-width:100%;touch-action:none}
+.hint{position:absolute;left:10px;top:8px;font-family:var(--f-display);font-size:13px;opacity:.7;pointer-events:none}
+.badge{position:absolute;right:10px;top:8px;font-family:var(--f-display);font-size:16px;padding:2px 10px;border:2px solid var(--fg);border-radius:4px;background:var(--panel)}
+.badge.boom{background:var(--target);color:var(--btn-on-fg);border-color:var(--target)}
+@media (max-width:560px){.hint{display:none}}
+.pad{display:flex;gap:8px;justify-content:center}
+.pad button{font-family:var(--f-display);font-size:18px;min-width:56px;padding:10px 14px}
+.charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media (max-width:760px){.charts{grid-template-columns:minmax(0,1fr)}}
+.chart{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-width:0}
+.chart canvas{display:block;width:100%;height:200px}
+.chart .head{display:flex;justify-content:space-between;gap:8px;font-size:13px}
+.chart .head b{font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+@media (max-width:960px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.grid{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;display:grid;gap:14px;min-width:0;align-content:start}
+.card h2{margin:0;font-size:15px}
+.label{font-size:12px;letter-spacing:.08em;color:var(--muted);font-weight:700;margin-bottom:4px}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+button{font-family:var(--f-body);font-size:14px;font-weight:700;color:var(--fg);background:var(--btn);border:1px solid var(--line);border-radius:6px;padding:8px 12px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--fg)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button:focus-visible,input:focus-visible{outline:2px solid var(--hero);outline-offset:2px}
+button[aria-pressed="true"]{background:var(--btn-on);color:var(--btn-on-fg);border-color:var(--btn-on)}
+.slider{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;align-items:center}
+.slider label{font-weight:700;font-size:14px}
+.slider output{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:14px}
+.slider input{grid-column:1/-1;width:100%}
+[hidden]{display:none!important}
+dl{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 16px;margin:0}
+dt{color:var(--muted);font-size:13px}
+dd{margin:0;text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.explain{font-size:13.5px;margin:0;padding:10px 12px;border-left:3px solid var(--hero);background:var(--room2);border-radius:0 6px 6px 0}
+.explain.boom{border-left-color:var(--target)}
+</style>
+
+<div class="wrap">
+  <nav class="steps" aria-label="講義の段階"><a href="index.html">講義の流れ</a><a href="lj-box.html#force">1 力場</a><a href="jump-integrator.html">2 時間積分</a><a href="thermo-room.html">3 温度・圧力</a><a href="lj-box.html#props">4 物性へ</a><a href="molecule.html">＋ 小分子</a><a href="polymer.html" aria-current="page">＋ 高分子</a></nav>
+  <header>
+    <h1>高分子の鎖</h1>
+    <p>ビーズをつないだ鎖。硬さ・溶媒・温度を変えて、広がり方・ゴムのような弾性・固まり方を見る。</p>
+  </header>
+
+  <div class="screen">
+    <canvas id="cv" tabindex="0" aria-label="鎖の画面。矢印キーでキャラが上下左右に泳ぐ"></canvas>
+    <div class="hint">← → ↑ ↓ 泳ぐ（Space でも上へ）</div>
+    <div class="badge" id="badge">1本の鎖</div>
+  </div>
+  <div class="pad" aria-label="タッチ操作">
+    <button id="bL" aria-label="左へ泳ぐ">◀</button>
+    <button id="bU" aria-label="上へ泳ぐ">▲</button>
+    <button id="bD" aria-label="下へ泳ぐ">▼</button>
+    <button id="bR" aria-label="右へ泳ぐ">▶</button>
+  </div>
+
+  <div class="chart" id="chartBox">
+    <div class="head"><span id="h4t">鎖の広がり：末端間距離 R と回転半径 Rg</span><b id="h4"></b></div>
+    <canvas id="ch4"></canvas>
+  </div>
+
+  <div class="grid">
+    <section class="card" aria-label="鎖・溶媒・温度">
+      <h2>鎖・溶媒・温度</h2>
+      <div class="seg" id="modeSeg">
+        <button data-m="single">1本の鎖</button>
+        <button data-m="melt">たくさんの鎖（メルト）</button>
+      </div>
+      <div>
+        <div class="label">鎖の硬さ</div>
+        <div class="seg" id="kaSeg">
+          <button data-k="0">柔らかい</button>
+          <button data-k="3">やや硬い</button>
+          <button data-k="6">硬い</button>
+        </div>
+      </div>
+      <div class="slider">
+        <label for="sT">温度 T₀（Langevin）</label><output id="oT"></output>
+        <input type="range" id="sT" min="0.05" max="2" step="0.01" value="1">
+      </div>
+      <div id="solvBox">
+        <div class="label">溶媒（＝ビーズどうしの引力 ε）</div>
+        <div class="seg" id="solvSeg">
+          <button data-e="0">良溶媒</button>
+          <button data-e="0.6">中間</button>
+          <button data-e="1.5">貧溶媒</button>
+        </div>
+      </div>
+      <div class="slider" id="nBox">
+        <label for="sN">ビーズの数 N</label><output id="oN"></output>
+        <input type="range" id="sN" min="10" max="60" step="1" value="30">
+      </div>
+    </section>
+
+    <section class="card" aria-label="操作">
+      <h2>操作</h2>
+      <div class="seg">
+        <button id="bGrab" aria-pressed="false">鎖を壁とキャラにつなぐ</button>
+      </div>
+      <div id="coolBox" hidden>
+        <div class="label">冷やし方（ガラス転移・結晶化）</div>
+        <div class="seg">
+          <button id="bHeat">熱する（T₀ = 2）</button>
+          <button id="bQuench">急冷（T₀ = 0.05）</button>
+          <button id="bSlow" aria-pressed="false">ゆっくり冷やす（60 秒）</button>
+        </div>
+      </div>
+      <div id="colBox" hidden>
+        <div class="label">ビーズの色</div>
+        <div class="seg" id="colSeg">
+          <button data-c="chain">鎖ごと</button>
+          <button data-c="orient">結合の向き</button>
+        </div>
+      </div>
+      <div class="seg">
+        <button id="bPause" aria-pressed="false">一時停止</button>
+        <button id="bReset">リセット</button>
+      </div>
+    </section>
+
+    <section class="card" aria-label="測定値">
+      <h2>測定値</h2>
+      <dl>
+        <dt>温度 T</dt><dd id="rT"></dd>
+        <dt id="rRt">末端間距離 R / 回転半径 Rg</dt><dd id="rR"></dd>
+        <dt id="rXt">鎖がキャラを引く力 F（1τ 平均）</dt><dd id="rX"></dd>
+      </dl>
+    </section>
+  </div>
+  <p class="explain" id="explain"></p>
+</div>
+
+<script>
+(() => {
+  // ---------- parameters (reduced units: m = k_B = 1; LJ core ε = 1) ----------
+  const TS = 3, TS_1 = 5;                             // τ per real second: melt / single chain
+  const A_HERO = 1.0, M_HERO = 20, THRUST = 3, GAM_H = 0.8;
+  const GAMMA = 0.5, GAMMA_1 = 0.2;                   // Langevin friction: melt / single chain (lower = recoils faster)
+  const WCA_H = 2 ** (1 / 6), K_TETHER = 15, R_TETHER = 2.2, K_ANCHOR = 50, F_CAP = 20;
+  const M_HERO_GRAB = 2;                              // lighter while tied, so the chain's pull is felt
+  let N_CH = 12, L_CH = 10;                           // melt: 12 chains × 10 beads
+  const T_HOT = 2, T_COLD = 0.05, RAMP_TAU = 180;     // slow cooling: 180τ = 60 s on screen
+  const DEF = { kb: 400, r0: 1, ka: 0, th0: 180, sig: 1 };
+  const P = { mode: 'single', ...DEF, eps: 0, T0: 1, N: 30, dt: 0.005, slowmo: false, grab: false,
+              color: 'chain', paused: false, ramp: null };
+  const KEYMAP = { ArrowLeft: 'L', a: 'L', ArrowRight: 'R', d: 'R', ArrowUp: 'U', w: 'U', ' ': 'U', ArrowDown: 'D', s: 'D' };
+
+  const EXPLAIN = {
+    single: '<b>1本の鎖</b>：ビーズを結合（バネ）でつないだ鎖。「鎖の硬さ」は角度の項の強さ、「溶媒」はビーズどうしの引力。力場の1つ1つの項は「＋ 小分子」で見る。',
+    melt: '<b>メルト</b>：鎖 12 本 × 10 ビーズを周期境界の箱に詰めた。「熱する」で溶かしてから冷やし方を比べる。おすすめは「やや硬い k_θ = 3」で急冷とゆっくりを比べること。',
+    pluck: '<b>結合をはじいた</b>：真ん中の結合を 1.3 倍に伸ばして離した。グラフが振動する。k_b を大きくすると周期が短くなる（周期 = 2π/√(2k_b/m)）。',
+    boom: '<b>爆発した！</b> Δt が結合の振動の周期にくらべて大きすぎると、速度ベレ法でも計算がこわれる（目安：Δt が周期の 1/10 より小さいこと）。Δt を小さくするか k_b を下げて「リセット」。',
+    grab: '<b>鎖の一端を壁、もう一端をキャラにつないだ</b>：右へ泳いで引っぱると、鎖がキャラを<b>引き戻す</b>（赤い矢印）。キーを離すと壁の方へ戻される。ε = 0（引力なし）でも戻るのは、のびた形は<b>並び方の数が少ない＝エントロピーが小さい</b>から（エントロピー弾性。ゴムと同じ）。のびきりに近いほど力が急に強くなる。温度を上げると同じのびでも力が強くなる（右下のグラフで比べる）。',
+    good: '<b>良溶媒</b>（ε ≈ 0）：ビーズどうしは反発だけ。鎖は広がった<b>コイル</b>になる。',
+    mid: '<b>中間</b>：引力と広がろうとする力がほぼつり合う。Rg が大きく揺れる。',
+    poor: '<b>貧溶媒</b>（ε 大）：ビーズどうしが引き合い、鎖が丸まった<b>グロビュール</b>になる（コイル–グロビュール転移）。Rg が小さくなる。',
+    quench: '<b>急冷</b>：鎖が並び直す前に動けなくなる＝<b>ガラス</b>。「やや硬い」鎖なら、ゆっくり冷やしたときより U/N が高く、並びのそろい S が低いまま止まる。',
+    slow: '<b>ゆっくり冷やす</b>：右下に U/N を温度に対して描く。途中で<b>急に下がる</b>所があれば<b>結晶化</b>（鎖が平行に並ぶ。S が上がる）、なめらかに曲がるだけなら<b>ガラス転移</b>。柔らかい鎖は結晶しにくく、硬い鎖は急冷でも結晶する。灰色は前の結果。',
+    orient: '色＝<b>結合の向き</b>（180° 回すと同じ色）。同じ色がそろった帯＝鎖が平行に並んだ<b>結晶</b>の部分。'
+  };
+
+  // ---------- state ----------
+  let LX = 30, LY = 15.75, pbc = false;
+  let beads = [], bonds = [], angles = [], hero, Ub = 0, Ua = 0, Ul = 0, simT = 0, exploded = false;
+  let lastMsg = null, tension = 0, fAvg = 0, grabT = 0, Snem = NaN;
+  const histB = [], histR = [], runs = [];   // bond length per step; [R, Rg] per 0.1 s; U/N vs T runs
+  const feSets = [];                          // force–extension: [{T, pts:[[R, F]]}], newest last
+  const keys = { L: false, R: false, U: false, D: false };
+
+  function gauss() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+  const wrapX = d => d - LX * Math.round(d / LX), wrapY = d => d - LY * Math.round(d / LY);
+  function sep(a, b) { let dx = b.x - a.x, dy = b.y - a.y; if (pbc) { dx = wrapX(dx); dy = wrapY(dy); } return [dx, dy]; }
+
+  function addChain(pts, c) {
+    const s = Math.sqrt(P.T0), i0 = beads.length;
+    pts.forEach(([x, y], k) => {
+      beads.push({ x, y, vx: gauss() * s, vy: gauss() * s, ax: 0, ay: 0, c, wx: 0, wy: 0 });
+      if (k > 0) bonds.push([i0 + k - 1, i0 + k]);
+      if (k > 1) angles.push([i0 + k - 2, i0 + k - 1, i0 + k]);
+    });
+  }
+  function reset() {
+    beads = []; bonds = []; angles = []; exploded = false; lastMsg = null;
+    histB.length = 0; histR.length = 0; P.ramp = null;
+    if (P.mode === 'single') {
+      LX = 30; LY = 15.75; pbc = false;
+      // serpentine start, rows of ≤ 14 beads, centred
+      const row = Math.min(14, P.N), pts = [];
+      const nRows = Math.ceil(P.N / row), x0 = LX / 2 - (row - 1) * P.r0 / 2, y0 = LY / 2 - (nRows - 1) * 1.2 / 2;
+      for (let k = 0; k < P.N; k++) {
+        const r = Math.floor(k / row), j = k % row, jj = r % 2 ? row - 1 - j : j;
+        pts.push([x0 + jj * P.r0, y0 + r * 1.2]);
+      }
+      addChain(pts, 0);
+      hero = { x: 3, y: 3, vx: 0, vy: 0, ax: 0, ay: 0, fx: 0, fy: 0, face: 1 };
+    } else {
+      LX = 20; LY = 10.5; pbc = true;
+      for (let c = 0; c < N_CH; c++) {
+        const y = (c + 0.5) * LY / N_CH, pts = [];
+        const x0 = 0.6 + (c % 2) * 6;                  // staggered rows
+        for (let k = 0; k < L_CH; k++) pts.push([x0 + k * 1.0, y]);
+        addChain(pts, c);
+      }
+      hero = { x: LX - 1.8, y: LY / 2, vx: 0, vy: 0, ax: 0, ay: 0, fx: 0, fy: 0, face: -1 };
+    }
+    forces(); heroAcc();
+  }
+
+  function temperature() {
+    let k = 0; for (const b of beads) k += b.vx * b.vx + b.vy * b.vy;
+    return beads.length ? 0.5 * k / beads.length : 0;
+  }
+
+  // ---------- force field ----------
+  // non-bonded: WCA core (ε_core = 1) + attractive LJ tail scaled by ε, cut at 2.5σ; 1-2 pairs excluded
+  const LJ_RC = 4 * (0.4 ** 12 - 0.4 ** 6);   // LJ(2.5σ)/ε, the tail's shift
+  function ljPair(r2) {
+    const sg2 = P.sig * P.sig, rc2 = 6.25 * sg2, rm2 = 2 ** (1 / 3) * sg2;
+    if (r2 >= rc2 || (P.eps === 0 && r2 >= rm2)) return null;
+    const q = sg2 / Math.max(r2, 0.25 * sg2), q6 = q * q * q, f = 24 * q6 * (2 * q6 - 1) / Math.max(r2, 0.25 * sg2);
+    const c = LJ_RC, lj = 4 * q6 * (q6 - 1);
+    if (r2 < rm2) return { f, u: lj + 1 - P.eps * (1 + c) };
+    return { f: P.eps * f, u: P.eps * (lj - c) };
+  }
+  const ULJ = r => { const p = ljPair(r * r); return p ? p.u : 0; };
+
+  function forces() {
+    for (const b of beads) { b.ax = 0; b.ay = 0; }
+    hero.fx = 0; hero.fy = 0;
+    let ul = 0, ub = 0, ua = 0;
+    const n = beads.length, rcut = 2.5 * P.sig;
+    for (let i = 0; i < n; i++) {
+      const a = beads[i];
+      for (let j = i + 1; j < n; j++) {
+        const c = beads[j];
+        if (j === i + 1 && a.c === c.c) continue;     // bonded neighbours: excluded
+        let dx = c.x - a.x; if (pbc) dx = wrapX(dx);
+        if (dx > rcut || dx < -rcut) continue;
+        let dy = c.y - a.y; if (pbc) dy = wrapY(dy);
+        const p = ljPair(dx * dx + dy * dy);
+        if (!p) continue;
+        a.ax -= p.f * dx; a.ay -= p.f * dy; c.ax += p.f * dx; c.ay += p.f * dy; ul += p.u;
+      }
+      // bead ↔ hero: purely repulsive, shifted out by the hero's radius
+      const [dx, dy] = sep(hero, a), r = Math.hypot(dx, dy), s = r - A_HERO;
+      if (s < WCA_H && r > 1e-9) {
+        const ss = Math.max(s, 0.75), i6 = ss ** -6, f = 24 * i6 * (2 * i6 - 1) / ss / r;
+        a.ax += f * dx; a.ay += f * dy; hero.fx -= f * dx; hero.fy -= f * dy;
+      }
+    }
+    for (const [i, j] of bonds) {                    // U = k_b/2 (r − r₀)²
+      const a = beads[i], c = beads[j], [dx, dy] = sep(a, c), r = Math.hypot(dx, dy) || 1e-9;
+      const f = -P.kb * (r - P.r0) / r;
+      c.ax += f * dx; c.ay += f * dy; a.ax -= f * dx; a.ay -= f * dy; ub += 0.5 * P.kb * (r - P.r0) ** 2;
+    }
+    if (P.ka > 0) {                                  // U = k_θ (1 − cos(θ − θ₀)) ≈ k_θ/2 (θ − θ₀)²
+      const t0 = P.th0 * Math.PI / 180;
+      for (const [i, j, k] of angles) {
+        const bi = beads[i], bj = beads[j], bk = beads[k];
+        const [x1, y1] = sep(bj, bi), [x2, y2] = sep(bj, bk);
+        const n1 = Math.hypot(x1, y1) || 1e-9, n2 = Math.hypot(x2, y2) || 1e-9;
+        const cs = Math.max(-1, Math.min(1, (x1 * x2 + y1 * y2) / (n1 * n2))), th = Math.acos(cs);
+        // dU/dcosθ = −k_θ sin(θ − θ₀)/sinθ; for θ₀ = 180° this is exactly +k_θ, otherwise sinθ is kept off 0
+        const g = P.th0 === 180 ? P.ka : -P.ka * Math.sin(th - t0) / Math.max(Math.sin(th), 0.05);
+        const fix = -g * (x2 / (n1 * n2) - cs * x1 / (n1 * n1)), fiy = -g * (y2 / (n1 * n2) - cs * y1 / (n1 * n1));
+        const fkx = -g * (x1 / (n1 * n2) - cs * x2 / (n2 * n2)), fky = -g * (y1 / (n1 * n2) - cs * y2 / (n2 * n2));
+        bi.ax += fix; bi.ay += fiy; bk.ax += fkx; bk.ay += fky; bj.ax -= fix + fkx; bj.ay -= fiy + fky;
+        ua += P.ka * (1 - Math.cos(th - t0));
+      }
+    }
+    tension = 0;
+    if (P.grab && P.mode === 'single') {
+      // first bead pinned to the left wall, last bead tied to the hero; both springs capped so a far start stays gentle
+      const b0 = beads[0], ax = P.sig / 2 + 0.05 - b0.x, ay = LY / 2 - b0.y, ra = Math.hypot(ax, ay);
+      if (ra > 1e-9) { const fa = Math.min(K_ANCHOR * ra, F_CAP) / ra; b0.ax += fa * ax; b0.ay += fa * ay; }
+      const e = beads[beads.length - 1], [dx, dy] = sep(hero, e), r = Math.hypot(dx, dy) || 1e-9;
+      const mag = Math.max(-F_CAP, Math.min(F_CAP, K_TETHER * (r - R_TETHER)));
+      e.ax -= mag * dx / r; e.ay -= mag * dy / r; hero.fx += mag * dx / r; hero.fy += mag * dy / r;
+      tension = mag;
+    }
+    Ub = ub; Ua = ua; Ul = ul;
+  }
+  function heroAcc() {
+    const m = P.grab && P.mode === 'single' ? M_HERO_GRAB : M_HERO;
+    hero.ax = ((keys.R ? 1 : 0) - (keys.L ? 1 : 0)) * THRUST - GAM_H * hero.vx + hero.fx / m;
+    hero.ay = ((keys.U ? 1 : 0) - (keys.D ? 1 : 0)) * THRUST - GAM_H * hero.vy + hero.fy / m;
+  }
+  function boundary(o, r) {
+    if (pbc) {
+      const kx = Math.floor(o.x / LX), ky = Math.floor(o.y / LY);
+      if (kx || ky) { o.x -= LX * kx; o.y -= LY * ky; o.wx = (o.wx || 0) + kx; o.wy = (o.wy || 0) + ky; }
+      return;
+    }
+    if (o.x < r) { o.x = r; o.vx = Math.abs(o.vx); }
+    if (o.x > LX - r) { o.x = LX - r; o.vx = -Math.abs(o.vx); }
+    if (o.y < r) { o.y = r; o.vy = Math.abs(o.vy); }
+    if (o.y > LY - r) { o.y = LY - r; o.vy = -Math.abs(o.vy); }
+  }
+
+  // velocity Verlet for everything, then a Langevin kick on the beads
+  function step() {
+    const dt = P.dt, h = dt / 2, rb = P.sig / 2;
+    for (const b of beads) { b.vx += b.ax * h; b.vy += b.ay * h; b.x += b.vx * dt; b.y += b.vy * dt; boundary(b, rb); }
+    hero.vx += hero.ax * h; hero.vy += hero.ay * h; hero.x += hero.vx * dt; hero.y += hero.vy * dt;
+    boundary(hero, A_HERO);
+    forces(); heroAcc();
+    for (const b of beads) { b.vx += b.ax * h; b.vy += b.ay * h; }
+    hero.vx += hero.ax * h; hero.vy += hero.ay * h;
+    const gam = P.mode === 'melt' ? GAMMA : GAMMA_1;
+    const s = Math.sqrt(2 * gam * P.T0 * dt), f = 1 - gam * dt;
+    for (const b of beads) { b.vx = b.vx * f + s * gauss(); b.vy = b.vy * f + s * gauss(); }
+    if (Math.abs(hero.vx) > 0.1) hero.face = Math.sign(hero.vx);
+    simT += dt;
+    fAvg += (tension - fAvg) * Math.min(1, dt / 1.0);   // pull averaged over ~1τ (the raw value jitters)
+    if (P.ramp) {
+      const u = Math.min(1, (simT - P.ramp.t0) / RAMP_TAU);
+      P.T0 = P.ramp.from + (T_COLD - P.ramp.from) * u;
+      if (u >= 1) P.ramp = null;
+    }
+    const mb = bonds[Math.floor(bonds.length / 2)];   // the bond "結合をはじく" plucks
+    if (mb) {
+      const [dx, dy] = sep(beads[mb[0]], beads[mb[1]]); histB.push(Math.hypot(dx, dy));
+      const keep = Math.round(2 / dt); if (histB.length > keep) histB.splice(0, histB.length - keep);
+    }
+    // blow-up check: huge speed or NaN anywhere
+    for (const b of beads) if (!(b.vx * b.vx + b.vy * b.vy < 1e4)) { exploded = true; P.paused = true; lastMsg = 'boom'; break; }
+  }
+
+  // ---------- measurements ----------
+  function chainShape(c0, c1) {      // R_ee and Rg of beads [c0, c1), unwrapped along the bonds
+    let x = beads[c0].x, y = beads[c0].y; const pts = [[x, y]];
+    for (let i = c0 + 1; i < c1; i++) { const [dx, dy] = sep(beads[i - 1], beads[i]); x += dx; y += dy; pts.push([x, y]); }
+    const mx = pts.reduce((s, p) => s + p[0], 0) / pts.length, my = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+    const rg = Math.sqrt(pts.reduce((s, p) => s + (p[0] - mx) ** 2 + (p[1] - my) ** 2, 0) / pts.length);
+    const [ex, ey] = pts[pts.length - 1];
+    return { R: Math.hypot(ex - pts[0][0], ey - pts[0][1]), Rg: rg };
+  }
+  function shape() {
+    if (P.mode === 'single') return chainShape(0, beads.length);
+    let R = 0, Rg = 0;
+    for (let c = 0; c < N_CH; c++) { const s = chainShape(c * L_CH, (c + 1) * L_CH); R += s.R; Rg += s.Rg; }
+    return { R: R / N_CH, Rg: Rg / N_CH };
+  }
+  // local nematic order: mean cos 2Δφ over bond pairs of different chains whose midpoints lie within 1.5σ
+  function nematic() {
+    const m = bonds.map(([i, j]) => { const [dx, dy] = sep(beads[i], beads[j]); const a = beads[i];
+      return { x: a.x + dx / 2, y: a.y + dy / 2, phi: Math.atan2(dy, dx), c: a.c }; });
+    let s = 0, k = 0;
+    for (let i = 0; i < m.length; i++) for (let j = i + 1; j < m.length; j++) {
+      if (m[i].c === m[j].c) continue;
+      let dx = m[j].x - m[i].x, dy = m[j].y - m[i].y; if (pbc) { dx = wrapX(dx); dy = wrapY(dy); }
+      if (dx * dx + dy * dy > 2.25) continue;
+      s += Math.cos(2 * (m[i].phi - m[j].phi)); k++;
+    }
+    return k ? s / k : NaN;
+  }
+
+  // ---------- loop ----------
+  let acc = 0, last = performance.now(), lastSample = 0, lastUI = 0, lastRun = 0;
+  function frame(now) {
+    const real = Math.min(0.05, (now - last) / 1000); last = now;
+    if (!P.paused) {
+      acc += real * (P.mode === 'melt' ? TS : TS_1) * (P.slowmo ? 0.1 : 1);
+      let n = 0;
+      while (acc >= P.dt && n < 4000 && !P.paused) { step(); acc -= P.dt; n++; }
+      if (n >= 4000) acc = 0;
+      if (now - lastSample >= 100) {
+        lastSample = now;
+        const s = shape(); histR.push([s.R, s.Rg]); if (histR.length > 200) histR.shift();
+        if (P.grab && P.mode === 'single' && simT - grabT > 3) {   // skip the first 3τ while the ends settle
+          let set = feSets[feSets.length - 1];
+          if (!set || Math.abs(set.T - P.T0) > 0.04) { set = { T: P.T0, pts: [] }; feSets.push(set); if (feSets.length > 3) feSets.shift(); }
+          set.pts.push([s.R, fAvg]); if (set.pts.length > 600) set.pts.shift();
+        }
+      }
+      if (P.mode === 'melt' && runs.length && simT - lastRun >= 0.5) {
+        lastRun = simT; runs[runs.length - 1].pts.push([temperature(), (Ub + Ua + Ul) / beads.length]);
+      }
+    } else acc = 0;
+    if (!P.paused) heroAcc();
+    draw();
+    if (now - lastUI > 150) { updateUI(); drawCharts(); lastUI = now; }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- drawing ----------
+  const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  let cw = 0, ch = 0, S = 1;
+  function fit(c, g) {
+    const r = c.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr);
+    g.setTransform(dpr, 0, 0, dpr, 0, 0); return r;
+  }
+  new ResizeObserver(() => { const r = fit(cv, ctx); cw = r.width; ch = r.height; }).observe(cv);
+
+  let C = {};
+  function readColors() {
+    const cs = getComputedStyle(document.documentElement);
+    for (const k of ['room','room2','grid','bond','wall','hero','target','line1','line2','prev','fg','muted','panel'])
+      C[k] = cs.getPropertyValue('--' + k).trim();
+  }
+  readColors();
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+  new MutationObserver(readColors).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  const X = x => x * S, Y = y => ch - y * S;
+  function beadColor(i) {
+    const b = beads[i];
+    if (P.mode === 'single') return `hsl(${200 + 140 * i / Math.max(1, beads.length - 1)} 65% 52%)`;
+    if (P.color === 'orient') {
+      const j = i + 1 < beads.length && beads[i + 1].c === b.c ? i + 1 : i - 1;
+      const [dx, dy] = sep(beads[Math.min(i, j)], beads[Math.max(i, j)]);
+      const a = ((Math.atan2(dy, dx) % Math.PI) + Math.PI) % Math.PI;
+      return `hsl(${a / Math.PI * 360} 70% 52%)`;
+    }
+    return `hsl(${b.c * 360 / N_CH} 60% 52%)`;
+  }
+  function draw() {
+    if (!cw) return;
+    S = cw / LX;
+    ctx.fillStyle = C.room; ctx.fillRect(0, 0, cw, ch);
+    ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
+    for (let m = 1; m < LX; m++) { const x = Math.round(X(m)) + .5; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, ch); ctx.stroke(); }
+    for (let m = 1; m < LY; m++) { const y = Math.round(Y(m)) + .5; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cw, y); ctx.stroke(); }
+    const tiles = pbc ? [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 0], [0, 1], [1, -1], [1, 0], [1, 1]] : [[0, 0]];
+    const colors = beads.map((_, i) => beadColor(i));
+    for (const [ix, iy] of tiles) {
+      const sx = ix * LX, sy = iy * LY;
+      ctx.strokeStyle = C.bond; ctx.lineWidth = Math.max(2, P.sig * S * 0.22); ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (const [i, j] of bonds) { const a = beads[i], [dx, dy] = sep(a, beads[j]);
+        ctx.moveTo(X(a.x + sx), Y(a.y + sy)); ctx.lineTo(X(a.x + dx + sx), Y(a.y + dy + sy)); }
+      ctx.stroke();
+      beads.forEach((b, i) => {
+        ctx.fillStyle = colors[i];
+        ctx.beginPath(); ctx.arc(X(b.x + sx), Y(b.y + sy), 0.45 * P.sig * S, 0, Math.PI * 2); ctx.fill();
+      });
+      if (P.grab && P.mode === 'single') {
+        const e = beads[beads.length - 1], [dx, dy] = sep(hero, e), b0 = beads[0];
+        ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = C.target; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(X(hero.x + sx), Y(hero.y + sy)); ctx.lineTo(X(hero.x + dx + sx), Y(hero.y + dy + sy)); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(X(0), Y(LY / 2)); ctx.lineTo(X(b0.x), Y(b0.y)); ctx.stroke(); ctx.restore();
+        // wall mount where the first bead is pinned
+        ctx.fillStyle = C.wall; ctx.fillRect(0, Y(LY / 2) - S * 0.6, Math.max(6, S * 0.25), S * 1.2);
+      }
+      drawHero(sx, sy);
+      if (P.grab && P.mode === 'single' && fAvg > 0.05) {
+        // arrow on the hero: the chain's pull, length ∝ averaged force
+        const e = beads[beads.length - 1], [dx, dy] = sep(hero, e), r = Math.hypot(dx, dy) || 1;
+        const len = Math.min(6, 0.8 * fAvg), ux = dx / r, uy = dy / r;   // starts at the hero's edge
+        const px = X(hero.x + ux * A_HERO), py = Y(hero.y + uy * A_HERO), qx = px + ux * len * S, qy = py - uy * len * S, hd = Math.max(8, S * 0.35);
+        ctx.strokeStyle = C.target; ctx.fillStyle = C.target; ctx.lineWidth = Math.max(3, S * 0.12);
+        ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(qx, qy); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(qx, qy);
+        ctx.lineTo(qx - hd * (ux * .9 - uy * .5), qy + hd * (uy * .9 + ux * .5));
+        ctx.lineTo(qx - hd * (ux * .9 + uy * .5), qy + hd * (uy * .9 - ux * .5));
+        ctx.closePath(); ctx.fill();
+        ctx.font = '600 ' + Math.max(12, S * 0.5) + 'px "JetBrains Mono", monospace'; ctx.textAlign = 'center';
+        ctx.fillText('F = ' + fAvg.toFixed(1), X(hero.x), Y(hero.y) - S * 1.4);
+      }
+    }
+    if (pbc) { ctx.save(); ctx.setLineDash([8, 6]); ctx.strokeStyle = C.fg; ctx.lineWidth = 2; ctx.strokeRect(1, 1, cw - 2, ch - 2); ctx.restore(); }
+    else { ctx.strokeStyle = C.wall; ctx.lineWidth = Math.max(6, S * .2); ctx.strokeRect(0, 0, cw, ch); }
+  }
+  function drawHero(sx, sy) {
+    const half = A_HERO * 0.95, x = X(hero.x + sx - half), y = Y(hero.y + sy + half), w = 2 * half * S, h = w;
+    if (x > cw || y > ch || x + w < 0 || y + h < 0) return;
+    ctx.fillStyle = C.hero; ctx.strokeStyle = C.fg; ctx.lineWidth = Math.max(1.5, S * .06);
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, w * .32); ctx.fill(); ctx.stroke();
+    const ex = x + w * (hero.face > 0 ? .58 : .22), ey = y + h * .32;
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(ex, ey, w * .14, h * .24); ctx.fillRect(ex + w * .2, ey, w * .14, h * .24);
+    ctx.fillStyle = '#111111'; const px = hero.face > 0 ? w * .06 : 0, py = hero.vy > .5 ? 0 : h * .1;
+    ctx.fillRect(ex + px, ey + py, w * .08, h * .12); ctx.fillRect(ex + w * .2 + px, ey + py, w * .08, h * .12);
+  }
+
+  // chart: chain spread (single), force–extension (tied), or U/N while cooling (melt)
+  const c4 = document.getElementById('ch4'), g4 = c4.getContext('2d');
+  let r4 = { width: 0 };
+  new ResizeObserver(() => { r4 = fit(c4, g4); drawCharts(); }).observe(c4);
+  function axes(g, r, x0, x1, y0, y1, yticks, xticks, xfmt) {
+    const w = r.width, h = r.height, L = 38, B = 18, T = 6, Rp = 6;
+    g.clearRect(0, 0, w, h);
+    const xv = v => L + (w - L - Rp) * (v - x0) / (x1 - x0), yv = v => T + (h - T - B) * (y1 - v) / (y1 - y0);
+    g.strokeStyle = C.grid; g.fillStyle = C.muted; g.lineWidth = 1;
+    g.font = '11px "JetBrains Mono", monospace'; g.textBaseline = 'middle'; g.textAlign = 'right';
+    for (const v of yticks) { const y = Math.round(yv(v)) + .5; g.beginPath(); g.moveTo(L, y); g.lineTo(w - Rp, y); g.stroke(); g.fillText(String(+v.toFixed(2)), L - 4, y); }
+    g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+    for (const v of xticks) g.fillText(xfmt(v), xv(v), h - 3);
+    return { xv, yv, w, h, L, Rp };
+  }
+  function drawR() {
+    const g = g4, r = r4; if (!r.width) return;
+    const ymax = Math.max(4, Math.ceil(Math.max(...histR.map(p => p[0]), 1) / 2) * 2);
+    const A = axes(g, r, 0, 199, 0, ymax, [0, ymax / 2, ymax], [], () => '');
+    [[0, C.line1], [1, C.line2]].forEach(([k, col]) => {
+      g.strokeStyle = col; g.lineWidth = 2; g.beginPath();
+      histR.forEach((p, i) => { const x = A.xv(i), y = A.yv(Math.min(ymax, p[k])); i ? g.lineTo(x, y) : g.moveTo(x, y); });
+      g.stroke();
+    });
+    g.textAlign = 'left'; g.fillStyle = C.muted; g.fillText('過去 20 s', A.L + 2, A.h - 3);
+    g.font = '12px "Zen Kaku Gothic New", sans-serif';
+    g.fillStyle = C.line1; g.fillText('R', A.w - 40, A.yv(ymax) + 12); g.fillStyle = C.line2; g.fillText('Rg', A.w - 22, A.yv(ymax) + 12);
+  }
+  function drawUT() {
+    const g = g4, r = r4; if (!r.width) return;
+    const all = runs.flatMap(rn => rn.pts);
+    let ymin = Math.min(-1, ...all.map(p => p[1])), ymax = Math.max(1, ...all.map(p => p[1]));
+    ymin = Math.floor(ymin); ymax = Math.ceil(ymax);
+    const A = axes(g, r, 0, 2.1, ymin, ymax, [ymin, (ymin + ymax) / 2, ymax], [0, 0.5, 1, 1.5, 2], v => 'T=' + v);
+    runs.forEach((rn, k) => {
+      const cur = k === runs.length - 1;
+      g.fillStyle = cur ? C.line1 : C.prev;
+      for (const [T, u] of rn.pts) { g.beginPath(); g.arc(A.xv(Math.min(2.1, T)), A.yv(u), cur ? 2.4 : 1.8, 0, Math.PI * 2); g.fill(); }
+      if (rn.pts.length) { const [T, u] = rn.pts[rn.pts.length - 1];
+        g.font = '11px "Zen Kaku Gothic New", sans-serif'; g.textAlign = 'left';
+        g.fillText(rn.label, A.xv(Math.min(1.7, T)) + 4, A.yv(u) - 6); }
+    });
+    if (!runs.length) { g.fillStyle = C.muted; g.textAlign = 'center'; g.font = '12px "Zen Kaku Gothic New", sans-serif';
+      g.fillText('「熱する」→「ゆっくり冷やす」か「急冷」で描く', A.xv(1.05), A.yv((ymin + ymax) / 2)); }
+  }
+  function drawFE() {   // force–extension curve while the chain is tied between wall and hero
+    const g = g4, r = r4; if (!r.width) return;
+    const Lc = (beads.length - 1) * P.r0, all = feSets.flatMap(st => st.pts);
+    const fmax = Math.max(4, Math.ceil(Math.max(0, ...all.map(p => p[1])) / 2) * 2);
+    const xt = [0, Lc / 4, Lc / 2, 3 * Lc / 4, Lc].map(v => +v.toFixed(0));
+    const A = axes(g, r, 0, Lc, -1, fmax, [0, fmax / 2, fmax], xt, v => 'R=' + v);
+    feSets.forEach((st, k) => {
+      const cur = k === feSets.length - 1;
+      g.fillStyle = cur ? C.target : C.prev;
+      for (const [R, F] of st.pts) { g.beginPath(); g.arc(A.xv(Math.min(Lc, R)), A.yv(Math.max(-1, Math.min(fmax, F))), cur ? 2.2 : 1.6, 0, Math.PI * 2); g.fill(); }
+      if (st.pts.length) { const [R, F] = st.pts[st.pts.length - 1];
+        g.font = '11px "Zen Kaku Gothic New", sans-serif'; g.textAlign = 'left';
+        g.fillText('T=' + st.T.toFixed(2), A.xv(Math.min(Lc * 0.85, R)) + 4, A.yv(Math.max(-1, Math.min(fmax, F))) - 6); }
+    });
+    g.save(); g.setLineDash([4, 4]); g.strokeStyle = C.muted; g.beginPath(); g.moveTo(A.xv(Lc), A.yv(-1)); g.lineTo(A.xv(Lc), A.yv(fmax)); g.stroke(); g.restore();
+    g.fillStyle = C.muted; g.textAlign = 'right'; g.font = '11px "Zen Kaku Gothic New", sans-serif';
+    g.fillText('のびきり', A.xv(Lc) - 4, A.yv(fmax) + 12);
+    if (!all.length) { g.textAlign = 'center'; g.fillText('泳いで引っぱると点が増える', A.xv(Lc / 2), A.yv(fmax / 2)); }
+  }
+  function drawCharts() { P.mode === 'melt' ? drawUT() : P.grab ? drawFE() : drawR(); }
+
+  // ---------- UI ----------
+  const $ = id => document.getElementById(id);
+  function updateUI() {
+    const s = shape();
+    $('rT').textContent = temperature().toFixed(2);
+    $('rR').textContent = s.R.toFixed(2) + ' / ' + s.Rg.toFixed(2);
+    if (P.mode === 'melt') { Snem = nematic(); $('rX').textContent = isFinite(Snem) ? Snem.toFixed(2) : '—'; }
+    else $('rX').textContent = P.grab ? fAvg.toFixed(2) : '—';
+    $('h4').textContent = P.mode === 'melt' ? (isFinite(Snem) ? 'S = ' + Snem.toFixed(2) : '') : P.grab ? 'F = ' + fAvg.toFixed(2) + ', R = ' + s.R.toFixed(1) : 'Rg = ' + s.Rg.toFixed(2);
+    if (P.ramp || rampShown || (exploded && !$('badge').classList.contains('boom'))) syncUI();
+  }
+  let rampShown = false;
+  function syncUI() {
+    const melt = P.mode === 'melt';
+    $('oT').textContent = P.T0.toFixed(2); $('oN').textContent = P.N;
+    $('sT').value = P.T0; $('sN').value = P.N;
+    document.querySelectorAll('#modeSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.m === P.mode)));
+    document.querySelectorAll('#solvSeg button').forEach(b => b.setAttribute('aria-pressed', String(Math.abs(+b.dataset.e - P.eps) < 1e-6)));
+    document.querySelectorAll('#colSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.c === P.color)));
+    document.querySelectorAll('#kaSeg button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.k === P.ka)));
+    $('solvBox').hidden = melt; $('nBox').hidden = melt; $('bGrab').hidden = melt; $('coolBox').hidden = !melt; $('colBox').hidden = !melt;
+    $('bGrab').setAttribute('aria-pressed', String(P.grab)); $('bGrab').textContent = P.grab ? 'はなす' : '鎖を壁とキャラにつなぐ';
+    $('bSlow').setAttribute('aria-pressed', String(!!P.ramp)); rampShown = !!P.ramp;
+    $('bSlow').textContent = P.ramp ? `ゆっくり冷やす中… 残り ${Math.ceil((RAMP_TAU - (simT - P.ramp.t0)) / TS)} 秒` : 'ゆっくり冷やす（60 秒）';
+    $('bPause').setAttribute('aria-pressed', String(P.paused)); $('bPause').textContent = P.paused ? '再開' : '一時停止';
+    $('bPause').disabled = exploded;
+    $('h4t').textContent = melt ? '冷やしながら測る U/N（急に下がる＝結晶化、なめらか＝ガラス転移）'
+      : P.grab ? '力–のび曲線 F と R（灰色＝前の温度）' : '鎖の広がり：末端間距離 R と回転半径 Rg';
+    $('rRt').textContent = melt ? '1本あたりの R / Rg（平均）' : '末端間距離 R / 回転半径 Rg';
+    $('rXt').textContent = melt ? '並びのそろい S（1 = 平行）' : '鎖がキャラを引く力 F（1τ 平均）';
+    const bd = $('badge'); bd.classList.toggle('boom', exploded);
+    bd.textContent = exploded ? '計算がこわれた（リセット）' : (melt ? 'メルト' : '1本の鎖') + ' · T₀ = ' + P.T0.toFixed(2);
+    let ex;
+    if (lastMsg) ex = EXPLAIN[lastMsg];
+    else if (melt) ex = EXPLAIN.melt;
+    else ex = EXPLAIN.single + '<br>' + (P.eps < 0.3 ? EXPLAIN.good : P.eps < 1 ? EXPLAIN.mid : EXPLAIN.poor);
+    if (melt && P.color === 'orient') ex += '<br>' + EXPLAIN.orient;
+    $('explain').innerHTML = ex;
+  }
+
+  $('sT').addEventListener('input', e => { P.T0 = +e.target.value; P.ramp = null; syncUI(); });
+  $('sN').addEventListener('input', e => { P.N = +e.target.value; reset(); syncUI(); });
+  document.querySelectorAll('#modeSeg button').forEach(b => b.addEventListener('click', () => {
+    if (P.mode === b.dataset.m) return;
+    P.mode = b.dataset.m; P.grab = false; lastMsg = null;
+    if (P.mode === 'melt') { P.eps = 1; P.T0 = T_HOT; P.ka = 3; } else { P.eps = 0; P.T0 = 1; P.ka = 0; }
+    reset(); syncUI(); drawCharts();
+  }));
+  document.querySelectorAll('#solvSeg button').forEach(b => b.addEventListener('click', () => { P.eps = +b.dataset.e; lastMsg = null; syncUI(); drawCharts(); }));
+  document.querySelectorAll('#colSeg button').forEach(b => b.addEventListener('click', () => { P.color = b.dataset.c; syncUI(); }));
+  document.querySelectorAll('#kaSeg button').forEach(b => b.addEventListener('click', () => { P.ka = +b.dataset.k; P.th0 = 180; syncUI(); drawCharts(); }));
+  const stiffName = () => P.ka === 0 ? '柔らかい' : P.ka < 4.5 ? 'やや硬い' : '硬い';
+  $('bGrab').addEventListener('click', () => {
+    P.grab = !P.grab; lastMsg = P.grab ? 'grab' : null; fAvg = 0; grabT = simT;
+    if (P.grab) feSets.length = 0;
+    forces(); syncUI(); drawCharts();
+  });
+  $('bHeat').addEventListener('click', () => { P.ramp = null; P.T0 = T_HOT; lastMsg = null; syncUI(); });
+  function newRun(label) { runs.push({ label, pts: [] }); if (runs.length > 3) runs.shift(); lastRun = 0; }
+  $('bQuench').addEventListener('click', () => { P.ramp = null; P.T0 = T_COLD; newRun(stiffName() + '・急冷'); lastMsg = 'quench'; syncUI(); });
+  $('bSlow').addEventListener('click', () => {
+    if (P.ramp) { P.ramp = null; syncUI(); return; }
+    P.ramp = { t0: simT, from: P.T0 }; newRun(stiffName() + '・ゆっくり'); lastMsg = 'slow'; syncUI();
+  });
+  $('bPause').addEventListener('click', () => { P.paused = !P.paused; syncUI(); });
+  $('bReset').addEventListener('click', () => { P.paused = false; reset(); syncUI(); drawCharts(); });
+
+  addEventListener('keydown', e => {
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (tag === 'INPUT' && e.key.startsWith('Arrow')) return;
+    if (tag === 'BUTTON' && e.key === ' ') return;
+    const k = KEYMAP[e.key];
+    if (k) { keys[k] = true; e.preventDefault(); }
+  });
+  addEventListener('keyup', e => { const k = KEYMAP[e.key]; if (k) keys[k] = false; });
+  function hold(id, k) {
+    const el = $(id);
+    el.addEventListener('pointerdown', e => { keys[k] = true; el.setPointerCapture(e.pointerId); });
+    for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) el.addEventListener(t, () => keys[k] = false);
+  }
+  hold('bL', 'L'); hold('bR', 'R'); hold('bU', 'U'); hold('bD', 'D');
+  cv.addEventListener('pointerdown', () => cv.focus());
+
+  reset(); syncUI();
+  requestAnimationFrame(frame);
+})();
+</script>
+
+</html>

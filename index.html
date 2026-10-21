@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MD講義デモ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=JetBrains+Mono:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<style>
+/* Layout: theme + flow strip on top, then the four steps in lecture order */
+:root{
+  --bg:#e8edf0; --panel:#ffffff; --fg:#17212b; --muted:#5a6772; --line:#cfd8de; --room2:#e3ebf0;
+  --c1:#2a6fbd; --c2:#b97f08; --c3:#cf3f35;
+  --btn-on:#17212b; --btn-on-fg:#ffffff;
+  --f-display:"DotGothic16","Zen Kaku Gothic New",system-ui,sans-serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f151b; --panel:#17202a; --fg:#e4ebf0; --muted:#93a2ae; --line:#2b3845; --room2:#1b2733;
+  --c1:#5ea2ef; --c2:#e8b43a; --c3:#f0675c;
+  --btn-on:#e4ebf0; --btn-on-fg:#0f151b; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0f151b; --panel:#17202a; --fg:#e4ebf0; --muted:#93a2ae; --line:#2b3845; --room2:#1b2733;
+  --c1:#5ea2ef; --c2:#e8b43a; --c3:#f0675c;
+  --btn-on:#e4ebf0; --btn-on-fg:#0f151b; color-scheme:dark;}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--f-body);font-size:15px;line-height:1.7;margin:0;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 40px}
+.wrap{max-width:960px;margin:0 auto;display:grid;gap:20px}
+h1{font-family:var(--f-display);font-weight:400;font-size:clamp(26px,4.5vw,36px);margin:0;letter-spacing:.02em}
+.theme{margin:0;font-size:clamp(17px,2.4vw,20px);font-weight:700;text-wrap:pretty}
+.sub{margin:4px 0 0;color:var(--muted)}
+.flow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (max-width:640px){.flow{grid-template-columns:minmax(0,1fr)}}
+.flow div{background:var(--panel);border:1px solid var(--line);border-top:4px solid var(--c);border-radius:8px;padding:10px 12px}
+.flow b{display:block;font-family:var(--f-display);font-weight:400;font-size:18px}
+.flow span{font-size:13px;color:var(--muted)}
+ol{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+ol>li{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--c);border-radius:8px;padding:14px 16px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 16px;align-items:start}
+@media (max-width:640px){ol>li{grid-template-columns:auto minmax(0,1fr)}ol>li .min{grid-column:2}}
+.num{font-family:var(--f-display);font-size:28px;line-height:1;color:var(--c)}
+.stage{font-size:12px;letter-spacing:.08em;font-weight:700;color:var(--c)}
+h2{margin:0;font-size:18px}
+h2 a{color:var(--fg)}
+li ul{margin:6px 0 0;padding-left:1.2em;font-size:14px}
+.min{font-family:var(--f-mono);font-size:13px;color:var(--muted);white-space:nowrap}
+.note{font-size:13.5px;margin:0;padding:10px 12px;border-left:3px solid var(--c1);background:var(--room2);border-radius:0 6px 6px 0}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>MD講義デモ</h1>
+    <p class="sub">学部3年 · 分子動力学（MD）入門</p>
+  </header>
+
+  <p class="theme">MDは、古典力場から粒子の動きを計算し、統計力学で物性に変える方法だと説明できる</p>
+
+  <div class="flow" aria-label="講義の流れ">
+    <div style="--c:var(--c1)"><b>入力：古典力場</b><span>エネルギーの式 → 力が決まる</span></div>
+    <div style="--c:var(--c2)"><b>計算：MD</b><span>力 → Δt ずつ運動を進める。温度・圧力の条件をそろえる</span></div>
+    <div style="--c:var(--c3)"><b>出力：統計力学</b><span>粒子の動きの平均 → 構造・相・拡散などの物性</span></div>
+  </div>
+
+  <ol>
+    <li style="--c:var(--c1)">
+      <span class="num">1</span>
+      <div>
+        <div class="stage">入力：古典力場</div>
+        <h2><a href="lj-box.html#force">LJ粒子の箱</a> — 力はポテンシャルから</h2>
+        <ul>
+          <li>ε・σ のスライダーで U(r) の形を変える → 粒子のかたまり方が変わる（周期境界と温度だけのシンプル表示）</li>
+          <li>粒子をクリック → 相手が井戸の底に集まる。矢印＝合力</li>
+          <li><a href="molecule.html">小分子の力場</a>（ブタン）：結合・角度・二面角を1つずつ変えて MD。ニューマン投影図でトランスとゴーシュの入れかわりを見る。「結合をはじく」で振動、Δt を大きくすると爆発</li>
+          <li>クーロンはスライドで</li>
+        </ul>
+      </div>
+      <span class="min">8 分</span>
+    </li>
+    <li style="--c:var(--c2)">
+      <span class="num">2</span>
+      <div>
+        <div class="stage">計算：運動を進める</div>
+        <h2><a href="jump-integrator.html">ジャンプで学ぶ時間積分</a> — 積分法と Δt</h2>
+        <ul>
+          <li>Δt を 0.1 s 以上にして「3つ同時に比較」（← → で3体いっしょに動く）</li>
+          <li>飛んでいる間に「時間を逆回し」→ 速度ベレ法だけが踏み切った点に戻る。エネルギーのずれもベレ法だけ 0</li>
+          <li>分子の振動（バネでつながった2原子）：オイラー法は発散、ベレ法はエネルギーが一定で逆回しすると元にもどる</li>
+        </ul>
+      </div>
+      <span class="min">8 分</span>
+    </li>
+    <li style="--c:var(--c2)">
+      <span class="num">3</span>
+      <div>
+        <div class="stage">計算：条件をそろえる</div>
+        <h2><a href="thermo-room.html">サーモスタットの部屋</a> — NVE / NVT / NPT</h2>
+        <ul>
+          <li>NVE でキャラを走らせる → 温まる・冷える → 「温度を保つ仕組みが要る」</li>
+          <li>NVT でサーモスタットを比べる → NPT で温度を上げると部屋がふくらむ。温度・体積・圧力のグラフで見る</li>
+        </ul>
+      </div>
+      <span class="min">10 分</span>
+    </li>
+    <li style="--c:var(--c3)">
+      <span class="num">4</span>
+      <div>
+        <div class="stage">出力：統計力学で物性へ</div>
+        <h2><a href="lj-box.html#props">LJ粒子の箱（もう一度）</a> — 構造・拡散・結晶化</h2>
+        <ul>
+          <li>周期境界と「まわりのコピー」→ 少ない粒子で大きな物質をまねる</li>
+          <li>熱する → 気体。MSD が直線にのびる → 傾き ÷ 4 = 拡散係数 D</li>
+          <li>急冷 と ゆっくり冷やす を比べる（色＝結晶の向き）→ 多結晶 と 1つの結晶。MSD は横ばい、g(r) にピーク</li>
+          <li>壁で囲むと g(r) が変わる → 表面の影響</li>
+          <li>速さの分布：ヒストグラムがマクスウェル分布に重なる。温度で山の位置と幅が変わり、固体でも気体でも温度だけで決まる</li>
+          <li><a href="polymer.html">高分子の鎖</a>：一端を壁、もう一端をキャラにつないで引っぱる（エントロピー弾性・力–のび曲線）。溶媒を変えて Rg を比べる（コイル ↔ グロビュール）</li>
+          <li>メルトで「やや硬い」鎖を急冷 と ゆっくり冷やす → ガラス と 結晶（U/N と S を比べる）</li>
+        </ul>
+      </div>
+      <span class="min">10 分</span>
+    </li>
+  </ol>
+
+  <p class="note">各デモの上のバーから、前後の段階へ移動できる。HTML ファイルは同じフォルダに置いたまま開くこと（別々に置くとリンクが切れる）。</p>
+</div>
+</html>

@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>小分子の力場</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=JetBrains+Mono:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<style>
+/* Layout: 3D view | Newman projection on top, three potential charts, then bond | angle | dihedral+time cards, readout */
+:root{
+  --bg:#e8edf0; --panel:#ffffff; --fg:#17212b; --muted:#5a6772; --line:#cfd8de;
+  --room:#f4f7f9; --room2:#e3ebf0; --grid:rgba(23,33,43,.07);
+  --ch3:#c8553d; --ch2:#2a6fbd; --hyd:#8a97a3; --target:#cf3f35; --line1:#2a6fbd; --line2:#b97f08; --bar:rgba(42,111,189,.18);
+  --btn:#f2f5f7; --btn-on:#17212b; --btn-on-fg:#ffffff;
+  --f-display:"DotGothic16","Zen Kaku Gothic New",system-ui,sans-serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f151b; --panel:#17202a; --fg:#e4ebf0; --muted:#93a2ae; --line:#2b3845;
+  --room:#141d26; --room2:#1b2733; --grid:rgba(228,235,240,.06);
+  --ch3:#ec7a62; --ch2:#5ea2ef; --hyd:#71808c; --target:#f0675c; --line1:#5ea2ef; --line2:#e8b43a; --bar:rgba(94,162,239,.22);
+  --btn:#202b37; --btn-on:#e4ebf0; --btn-on-fg:#0f151b; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0f151b; --panel:#17202a; --fg:#e4ebf0; --muted:#93a2ae; --line:#2b3845;
+  --room:#141d26; --room2:#1b2733; --grid:rgba(228,235,240,.06);
+  --ch3:#ec7a62; --ch2:#5ea2ef; --hyd:#71808c; --target:#f0675c; --line1:#5ea2ef; --line2:#e8b43a; --bar:rgba(94,162,239,.22);
+  --btn:#202b37; --btn-on:#e4ebf0; --btn-on-fg:#0f151b; color-scheme:dark;}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--f-body);font-size:15px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 32px}
+.wrap{max-width:1080px;margin:0 auto;display:grid;gap:16px}
+.steps{display:flex;flex-wrap:wrap;gap:6px;font-size:13px}
+.steps a{color:var(--muted);text-decoration:none;padding:2px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel)}
+.steps a:hover{border-color:var(--fg);color:var(--fg)}
+.steps a[aria-current]{color:var(--btn-on-fg);background:var(--btn-on);border-color:var(--btn-on)}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 16px}
+h1{font-family:var(--f-display);font-weight:400;font-size:clamp(24px,4vw,34px);margin:0;letter-spacing:.02em}
+header p{margin:0;color:var(--muted)}
+.views{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:16px}
+@media (max-width:760px){.views{grid-template-columns:minmax(0,1fr)}}
+.screen{position:relative;border:2px solid var(--fg);border-radius:6px;overflow:hidden;background:var(--room);min-width:0}
+#cv3{display:block;width:100%;aspect-ratio:16/10;cursor:grab;touch-action:none}
+#cvN{display:block;width:100%;aspect-ratio:1/1}
+.hint{position:absolute;left:10px;top:8px;font-family:var(--f-display);font-size:13px;opacity:.7;pointer-events:none}
+.badge{position:absolute;right:10px;top:8px;font-family:var(--f-display);font-size:15px;padding:2px 10px;border:2px solid var(--fg);border-radius:4px;background:var(--panel)}
+.badge.boom{background:var(--target);color:var(--btn-on-fg);border-color:var(--target)}
+.cap{position:absolute;left:10px;bottom:8px;font-size:12px;color:var(--muted);pointer-events:none}
+.charts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+@media (max-width:860px){.charts{grid-template-columns:minmax(0,1fr)}}
+.chart{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-width:0}
+.chart canvas{display:block;width:100%;height:140px}
+.chart .head{display:flex;justify-content:space-between;gap:8px;font-size:13px}
+.chart .head b{font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+@media (max-width:1000px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.grid{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;display:grid;gap:12px;min-width:0;align-content:start}
+.card h2{margin:0;font-size:15px}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+button{font-family:var(--f-body);font-size:14px;font-weight:700;color:var(--fg);background:var(--btn);border:1px solid var(--line);border-radius:6px;padding:8px 12px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--fg)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button:focus-visible,input:focus-visible{outline:2px solid var(--ch2);outline-offset:2px}
+button[aria-pressed="true"]{background:var(--btn-on);color:var(--btn-on-fg);border-color:var(--btn-on)}
+.slider{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;align-items:center}
+.slider label{font-weight:700;font-size:14px}
+.slider output{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:13px}
+.slider input{grid-column:1/-1;width:100%}
+.formula{font-family:var(--f-mono);font-size:12.5px;color:var(--muted);margin:0}
+dl{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;margin:0}
+dt{color:var(--muted);font-size:13px}
+dd{margin:0;text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap;font-size:13.5px}
+.explain{font-size:13.5px;margin:0;padding:10px 12px;border-left:3px solid var(--ch2);background:var(--room2);border-radius:0 6px 6px 0}
+.explain.boom{border-left-color:var(--target)}
+</style>
+
+<div class="wrap">
+  <nav class="steps" aria-label="講義の段階"><a href="index.html">講義の流れ</a><a href="lj-box.html#force">1 力場</a><a href="jump-integrator.html">2 時間積分</a><a href="thermo-room.html">3 温度・圧力</a><a href="lj-box.html#props">4 物性へ</a><a href="molecule.html" aria-current="page">＋ 小分子</a><a href="polymer.html">＋ 高分子</a></nav>
+  <header>
+    <h1>小分子の力場</h1>
+    <p>ブタン（C₄H₁₀）を 4 つの粒（CH₃–CH₂–CH₂–CH₃）で表す。結合・角度・二面角の項を変えて MD を動かす。</p>
+  </header>
+
+  <div class="views">
+    <div class="screen">
+      <canvas id="cv3" aria-label="分子の3次元表示。ドラッグで回す"></canvas>
+      <div class="hint">ドラッグで回す</div>
+      <div class="badge" id="badge"></div>
+      <div class="cap">赤 = CH₃、青 = CH₂（水素はまとめて1つの粒）</div>
+    </div>
+    <div class="screen">
+      <canvas id="cvN" aria-label="C2–C3 結合にそって見たニューマン投影図"></canvas>
+      <div class="hint">ニューマン投影図（C2 → C3 方向に見る）</div>
+    </div>
+  </div>
+
+  <div class="charts">
+    <div class="chart">
+      <div class="head"><span>結合 U(r) = k_b/2 (r − r₀)²</span><b id="hB"></b></div>
+      <canvas id="chB"></canvas>
+    </div>
+    <div class="chart">
+      <div class="head"><span>角度 U(θ) = k_θ/2 (θ − θ₀)²</span><b id="hA"></b></div>
+      <canvas id="chA"></canvas>
+    </div>
+    <div class="chart">
+      <div class="head"><span>二面角 V(φ) と φ の出やすさ</span><b id="hD"></b></div>
+      <canvas id="chD"></canvas>
+    </div>
+  </div>
+
+  <div class="grid">
+    <section class="card" aria-label="結合">
+      <h2>結合（C–C）</h2>
+      <div class="slider">
+        <label for="sKb">強さ k_b</label><output id="oKb"></output>
+        <input type="range" id="sKb" min="0" max="100" step="1" value="78">
+      </div>
+      <div class="slider">
+        <label for="sR0">長さ r₀</label><output id="oR0"></output>
+        <input type="range" id="sR0" min="1.2" max="2.0" step="0.01" value="1.53">
+      </div>
+      <div class="seg"><button id="bPluck">真ん中の結合をはじく</button></div>
+    </section>
+
+    <section class="card" aria-label="角度">
+      <h2>角度（C–C–C）</h2>
+      <div class="slider">
+        <label for="sKa">強さ k_θ</label><output id="oKa"></output>
+        <input type="range" id="sKa" min="0" max="1000" step="10" value="520">
+      </div>
+      <div class="slider">
+        <label for="sTh">好きな角度 θ₀</label><output id="oTh"></output>
+        <input type="range" id="sTh" min="90" max="180" step="1" value="112">
+      </div>
+    </section>
+
+    <section class="card" aria-label="二面角">
+      <h2>二面角（C–C–C–C のねじれ）</h2>
+      <p class="formula">V(φ) = ½V₁(1+cosφ) + ½V₂(1−cos2φ) + ½V₃(1+cos3φ)</p>
+      <div class="slider">
+        <label for="sV">ねじれの強さ（ブタンの何倍）</label><output id="oV"></output>
+        <input type="range" id="sV" min="0" max="3" step="0.05" value="1">
+      </div>
+      <div class="seg"><button id="bDef">ブタン（OPLS）の値に戻す</button></div>
+    </section>
+
+    <section class="card" aria-label="温度と時間">
+      <h2>温度と時間</h2>
+      <div class="slider">
+        <label for="sT">温度 T</label><output id="oT"></output>
+        <input type="range" id="sT" min="50" max="1200" step="10" value="300">
+      </div>
+      <div class="slider">
+        <label for="sSp">再生の速さ（画面の1秒 = ）</label><output id="oSp"></output>
+        <input type="range" id="sSp" min="0" max="100" step="1" value="72">
+      </div>
+      <div class="slider">
+        <label for="sDt">時間刻み Δt</label><output id="oDt"></output>
+        <input type="range" id="sDt" min="0.25" max="12" step="0.25" value="1">
+      </div>
+      <div class="seg">
+        <button id="bPause" aria-pressed="false">一時停止</button>
+        <button id="bReset">リセット</button>
+      </div>
+    </section>
+  </div>
+
+  <section class="card" aria-label="測定値">
+    <dl id="dl">
+      <dt>温度 T（いまの値）</dt><dd id="rT"></dd>
+      <dt>結合の長さ r（3本）</dt><dd id="rR"></dd>
+      <dt>角度 θ（2つ）</dt><dd id="rA"></dd>
+      <dt>二面角 φ</dt><dd id="rD"></dd>
+      <dt>トランス / ゴーシュ の割合（ここまでの平均）</dt><dd id="rTG"></dd>
+      <dt>エネルギー：結合 / 角度 / 二面角（kJ/mol）</dt><dd id="rU"></dd>
+      <dt>結合の振動の周期 2π√(μ/k_b)</dt><dd id="rP"></dd>
+    </dl>
+  </section>
+  <p class="explain" id="explain"></p>
+</div>
+
+<script>
+(() => {
+  // ---------- units: Å, ps, g/mol, kJ/mol, K.  a [Å/ps²] = 100 · F [kJ/mol/Å] / m [g/mol] ----------
+  const KB = 0.0083145, UNIT = 100;
+  const MASS = [15.035, 14.027, 14.027, 15.035];        // CH₃, CH₂, CH₂, CH₃ (united atoms)
+  const OPLS = { V1: 5.904, V2: -1.134, V3: 13.159 };    // OPLS-UA butane torsion, kJ/mol (trans = 180°)
+  const DEF = { kb: 2650, r0: 1.53, ka: 520, th0: 112, vs: 1 };
+  const GAMMA = 2;                                       // Langevin friction, 1/ps
+  const P = { ...DEF, T: 300, dt: 0.001, speed: 5, paused: false };
+  const deg = Math.PI / 180;
+
+  const EXPLAIN = {
+    base: '<b>力場</b>：結合（ばね）・角度（曲げにくさ）・二面角（ねじれ）の3つの項でできている。左の分子は MD（速度ベレ法＋Langevin）で動いている。右のニューマン投影図で C1（手前）と C4（奥）の向きの差が二面角 φ。',
+    trans: 'いまは <b>トランス（アンチ）</b>：C1 と C4 が反対側（φ ≈ 180°）。いちばんエネルギーが低い。',
+    gauche: 'いまは <b>ゴーシュ</b>：φ ≈ ±60°。トランスより少し高い（約 3.6 kJ/mol）。ときどき山（約 14 kJ/mol）を越えて入れかわる。',
+    eclipsed: 'いまは <b>重なり形に近い</b>：手前と奥の結合が重なる向き（φ ≈ 0°, ±120°）。エネルギーが高いので長くはいない。',
+    pluck: '<b>結合をはじいた</b>：真ん中の結合を 0.3 Å のばした。再生の速さを遅く（0.05 ps くらい）すると振動が見える。周期は約 30 fs。',
+    boom: '<b>爆発した！</b> Δt が結合の振動（約 30 fs）にくらべて大きすぎる。Δt を小さくして「リセット」。目安は周期の 1/10〜1/20（1〜2 fs）。',
+    nov: '<b>ねじれの項 0</b>：二面角が自由に回る。φ の出やすさがほぼ平らになる。'
+  };
+
+  // ---------- state ----------
+  let pos = [], vel = [], frc = [], Ub = 0, Ua = 0, Ud = 0, exploded = false, lastMsg = null;
+  const hist = new Float64Array(72); let histN = 0, nTrans = 0, nGauche = 0, nAll = 0;
+  let view = { yaw: -0.5, pitch: 0.45 };
+
+  const v3 = {
+    sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]],
+    mul: (a, s) => [a[0] * s, a[1] * s, a[2] * s], dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+    cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+    len: a => Math.hypot(a[0], a[1], a[2])
+  };
+  function gauss() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+
+  function reset() {
+    // all-trans zigzag in the xy-plane
+    const r = P.r0, h = P.th0 * deg / 2, dx = r * Math.sin(h), dy = r * Math.cos(h);
+    pos = [[-1.5 * dx, dy / 2, 0], [-0.5 * dx, -dy / 2, 0], [0.5 * dx, dy / 2, 0], [1.5 * dx, -dy / 2, 0]];
+    vel = MASS.map(m => { const s = Math.sqrt(UNIT * KB * P.T / m); return [gauss() * s, gauss() * s, gauss() * s]; });
+    exploded = false; lastMsg = null; hist.fill(0); histN = 0; nTrans = nGauche = nAll = 0;
+    forces();
+  }
+
+  // ---------- force field ----------
+  function dihedral(p) {   // IUPAC sign, trans = ±180°
+    const b1 = v3.sub(p[1], p[0]), b2 = v3.sub(p[2], p[1]), b3 = v3.sub(p[3], p[2]);
+    const n1 = v3.cross(b1, b2), n2 = v3.cross(b2, b3), m1 = v3.cross(n1, v3.mul(b2, 1 / v3.len(b2)));
+    return { phi: Math.atan2(v3.dot(m1, n2), v3.dot(n1, n2)), b1, b2, b3, n1, n2 };
+  }
+  const Vtor = phi => P.vs * (0.5 * OPLS.V1 * (1 + Math.cos(phi)) + 0.5 * OPLS.V2 * (1 - Math.cos(2 * phi)) + 0.5 * OPLS.V3 * (1 + Math.cos(3 * phi)));
+  const dVtor = phi => P.vs * (-0.5 * OPLS.V1 * Math.sin(phi) + OPLS.V2 * Math.sin(2 * phi) - 1.5 * OPLS.V3 * Math.sin(3 * phi));
+  function angleOf(a, b, c) {
+    const u = v3.sub(a, b), w = v3.sub(c, b);
+    return Math.acos(Math.max(-1, Math.min(1, v3.dot(u, w) / (v3.len(u) * v3.len(w)))));
+  }
+  function forces() {
+    frc = pos.map(() => [0, 0, 0]); Ub = Ua = Ud = 0;
+    const addF = (i, f) => { frc[i][0] += f[0]; frc[i][1] += f[1]; frc[i][2] += f[2]; };
+    for (let i = 0; i < 3; i++) {                      // bonds: U = k_b/2 (r − r₀)²
+      const d = v3.sub(pos[i + 1], pos[i]), r = v3.len(d) || 1e-9, f = -P.kb * (r - P.r0) / r;
+      addF(i + 1, v3.mul(d, f)); addF(i, v3.mul(d, -f)); Ub += 0.5 * P.kb * (r - P.r0) ** 2;
+    }
+    for (let i = 0; i < 2; i++) {                      // angles: U = k_θ/2 (θ − θ₀)²
+      const a = pos[i], b = pos[i + 1], c = pos[i + 2];
+      const u = v3.sub(a, b), w = v3.sub(c, b), lu = v3.len(u), lw = v3.len(w);
+      const cs = Math.max(-1, Math.min(1, v3.dot(u, w) / (lu * lw))), th = Math.acos(cs), sn = Math.max(Math.sin(th), 1e-3);
+      const g = P.ka * (th - P.th0 * deg);             // dU/dθ;  dθ/dr = −(1/sinθ) dcosθ/dr
+      const fa = v3.mul(v3.sub(v3.mul(w, 1 / (lu * lw)), v3.mul(u, cs / (lu * lu))), g / sn);
+      const fc = v3.mul(v3.sub(v3.mul(u, 1 / (lu * lw)), v3.mul(w, cs / (lw * lw))), g / sn);
+      addF(i, fa); addF(i + 2, fc); addF(i + 1, v3.mul(v3.add(fa, fc), -1)); Ua += 0.5 * P.ka * (th - P.th0 * deg) ** 2;
+    }
+    if (P.vs > 0) {                                    // dihedral: Blondel–Karplus gradient (sums to zero force)
+      const D = dihedral(pos), lb2 = v3.len(D.b2), n1s = v3.dot(D.n1, D.n1) || 1e-12, n2s = v3.dot(D.n2, D.n2) || 1e-12;
+      const dV = dVtor(D.phi), c1 = v3.dot(D.b1, D.b2) / (n1s * lb2), c3 = v3.dot(D.b3, D.b2) / (n2s * lb2);
+      // g_i = ∂φ/∂r_i up to an overall sign fixed by this atan2 convention (checked against finite differences)
+      const g1 = v3.mul(D.n1, -lb2 / n1s), g4 = v3.mul(D.n2, lb2 / n2s);
+      const g2 = v3.add(v3.mul(D.n1, lb2 / n1s + c1), v3.mul(D.n2, c3));
+      const g3 = v3.add(v3.mul(D.n2, -c3 - lb2 / n2s), v3.mul(D.n1, -c1));
+      addF(0, v3.mul(g1, dV)); addF(1, v3.mul(g2, dV)); addF(2, v3.mul(g3, dV)); addF(3, v3.mul(g4, dV)); Ud = Vtor(D.phi);
+    }
+  }
+
+  // velocity Verlet, then the Langevin O-step (exact Ornstein–Uhlenbeck update)
+  function step() {
+    const dt = P.dt, h = dt / 2;
+    for (let i = 0; i < 4; i++) for (let k = 0; k < 3; k++) { vel[i][k] += UNIT * frc[i][k] / MASS[i] * h; pos[i][k] += vel[i][k] * dt; }
+    forces();
+    const c1 = Math.exp(-GAMMA * dt);
+    for (let i = 0; i < 4; i++) {
+      const s = Math.sqrt(UNIT * KB * P.T / MASS[i] * (1 - c1 * c1));
+      for (let k = 0; k < 3; k++) { vel[i][k] += UNIT * frc[i][k] / MASS[i] * h; vel[i][k] = vel[i][k] * c1 + s * gauss(); }
+    }
+    for (let i = 0; i < 3; i++) { const r = v3.len(v3.sub(pos[i + 1], pos[i])); if (!(r < 6)) { exploded = true; P.paused = true; lastMsg = 'boom'; return; } }
+    const phi = dihedral(pos).phi;
+    hist[Math.min(71, Math.floor((phi / deg + 180) / 5))]++; histN++;
+    const a = Math.abs(phi / deg); nAll++;
+    if (a > 120) nTrans++; else nGauche++;
+  }
+  function temperature() {
+    let k = 0; for (let i = 0; i < 4; i++) k += 0.5 * MASS[i] * v3.dot(vel[i], vel[i]) / UNIT;
+    return 2 * k / (3 * 4 * KB);
+  }
+
+  // ---------- loop ----------
+  let acc = 0, last = performance.now(), lastUI = 0;
+  function frame(now) {
+    const real = Math.min(0.05, (now - last) / 1000); last = now;
+    if (!P.paused) {
+      acc += real * P.speed;
+      let n = 0;
+      while (acc >= P.dt && n < 40000 && !P.paused) { step(); acc -= P.dt; n++; }
+      if (n >= 40000) acc = 0;
+    } else acc = 0;
+    draw3D(); drawNewman();
+    if (now - lastUI > 120) { updateUI(); drawCharts(); lastUI = now; }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- drawing ----------
+  function fitCanvas(c) {
+    const r = c.getBoundingClientRect(), dpr = window.devicePixelRatio || 1, g = c.getContext('2d');
+    c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr);
+    g.setTransform(dpr, 0, 0, dpr, 0, 0); return { g, w: r.width, h: r.height };
+  }
+  const ids = ['cv3', 'cvN', 'chB', 'chA', 'chD'], els = ids.map(id => document.getElementById(id));
+  let V = {};
+  const ro = new ResizeObserver(() => { ids.forEach((id, i) => V[id] = fitCanvas(els[i])); drawCharts(); });
+  els.forEach(e => ro.observe(e));
+
+  let C = {};
+  function readColors() {
+    const cs = getComputedStyle(document.documentElement);
+    for (const k of ['room','room2','grid','ch3','ch2','hyd','target','line1','line2','bar','fg','muted','panel'])
+      C[k] = cs.getPropertyValue('--' + k).trim();
+  }
+  readColors();
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+  new MutationObserver(readColors).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  // body frame: origin at the C2–C3 midpoint, x along C2→C3, C1 in the xy-plane (so tumbling is removed)
+  function bodyFrame() {
+    const ex0 = v3.sub(pos[2], pos[1]), ex = v3.mul(ex0, 1 / (v3.len(ex0) || 1));
+    const t = v3.sub(pos[0], pos[1]), ty = v3.sub(t, v3.mul(ex, v3.dot(t, ex)));
+    const ey = v3.mul(ty, 1 / (v3.len(ty) || 1)), ez = v3.cross(ex, ey);
+    const o = v3.mul(v3.add(pos[1], pos[2]), 0.5);
+    return pos.map(p => { const d = v3.sub(p, o); return [v3.dot(d, ex), v3.dot(d, ey), v3.dot(d, ez)]; });
+  }
+  function draw3D() {
+    const VV = V.cv3; if (!VV || !VV.w) return;
+    const { g, w, h } = VV, sc = w / 9;
+    g.fillStyle = C.room; g.fillRect(0, 0, w, h);
+    const b = bodyFrame(), cy = Math.cos(view.yaw), sy = Math.sin(view.yaw), cp = Math.cos(view.pitch), sp = Math.sin(view.pitch);
+    const proj = ([x, y, z]) => { const x1 = cy * x + sy * z, z1 = -sy * x + cy * z, y1 = cp * y - sp * z1, z2 = sp * y + cp * z1;
+      return [w / 2 + x1 * sc, h / 2 - y1 * sc, z2]; };
+    const q = b.map(proj);
+    // bonds, then atoms back to front
+    g.strokeStyle = C.muted; g.lineCap = 'round';
+    for (let i = 0; i < 3; i++) { g.lineWidth = Math.max(4, sc * 0.16); g.beginPath(); g.moveTo(q[i][0], q[i][1]); g.lineTo(q[i + 1][0], q[i + 1][1]); g.stroke(); }
+    const order = [0, 1, 2, 3].sort((i, j) => q[i][2] - q[j][2]);
+    for (const i of order) {
+      const [x, y, z] = q[i], rad = sc * 0.42 * (1 + 0.08 * z);
+      g.fillStyle = i === 0 || i === 3 ? C.ch3 : C.ch2; g.strokeStyle = C.fg; g.lineWidth = 1.5;
+      g.beginPath(); g.arc(x, y, rad, 0, Math.PI * 2); g.fill(); g.stroke();
+      g.fillStyle = '#ffffff'; g.font = '700 ' + Math.max(11, rad * 0.6) + 'px "JetBrains Mono", monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText('C' + (i + 1), x, y);
+    }
+  }
+  function drawNewman() {
+    const VV = V.cvN; if (!VV || !VV.w) return;
+    const { g, w, h } = VV, cx = w / 2, cy = h / 2 + 12, R = Math.min(w, h) * 0.15, L = Math.min(w, h) * 0.31;
+    g.fillStyle = C.room; g.fillRect(0, 0, w, h);
+    const b = bodyFrame();
+    // looking down +x: screen right = +y? use (y, z) with C1 pointing straight up
+    const a1 = Math.atan2(b[0][2], b[0][1]), a4 = Math.atan2(b[3][2], b[3][1]);
+    const ang = a => -Math.PI / 2 + (a - a1);         // rotate so C1 is at 12 o'clock
+    const ray = (a, r0, r1) => [cx + Math.cos(ang(a)) * r0, cy + Math.sin(ang(a)) * r0, cx + Math.cos(ang(a)) * r1, cy + Math.sin(ang(a)) * r1];
+    const drawSub = (a, r0, col, label, thin) => {
+      const [x0, y0, x1, y1] = ray(a, r0, L);
+      g.strokeStyle = col; g.lineWidth = thin ? 2 : 4; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+      g.fillStyle = col; g.font = (thin ? '' : '700 ') + '13px "JetBrains Mono", monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      const [, , x2, y2] = ray(a, 0, L + 14); g.fillText(label, x2, y2);
+    };
+    // back carbon (C3): circle, C4 and two hydrogens from its rim
+    for (const s of [2 * Math.PI / 3, -2 * Math.PI / 3]) drawSub(a4 + s, R, C.hyd, 'H', true);
+    drawSub(a4, R, C.ch3, 'C4');
+    g.fillStyle = C.room; g.strokeStyle = C.fg; g.lineWidth = 2.5; g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.fill(); g.stroke();
+    // front carbon (C2): bonds from the centre
+    for (const s of [2 * Math.PI / 3, -2 * Math.PI / 3]) drawSub(a1 + s, 0, C.hyd, 'H', true);
+    drawSub(a1, 0, C.ch3, 'C1');
+    g.fillStyle = C.fg; g.beginPath(); g.arc(cx, cy, 4, 0, Math.PI * 2); g.fill();
+    const phi = dihedral(pos).phi / deg;
+    g.fillStyle = C.fg; g.font = '700 15px "JetBrains Mono", monospace'; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+    g.fillText('φ = ' + phi.toFixed(0) + '°', 10, h - 12);
+    g.textAlign = 'right'; g.font = '700 14px "Zen Kaku Gothic New", sans-serif'; g.fillText(confName(phi), w - 10, h - 12);
+  }
+  function confName(phi) { const a = Math.abs(phi); return a > 150 ? 'トランス' : a > 30 && a < 90 ? 'ゴーシュ' : '重なり形に近い'; }
+
+  function axes(g, w, h, x0, x1, y0, y1, yticks, xticks, xfmt) {
+    const L = 34, B = 18, T = 6, Rp = 6;
+    g.clearRect(0, 0, w, h);
+    const xv = v => L + (w - L - Rp) * (v - x0) / (x1 - x0), yv = v => T + (h - T - B) * (y1 - v) / (y1 - y0);
+    g.strokeStyle = C.grid; g.fillStyle = C.muted; g.lineWidth = 1;
+    g.font = '11px "JetBrains Mono", monospace'; g.textBaseline = 'middle'; g.textAlign = 'right';
+    for (const v of yticks) { const y = Math.round(yv(v)) + .5; g.beginPath(); g.moveTo(L, y); g.lineTo(w - Rp, y); g.stroke(); g.fillText(String(v), L - 4, y); }
+    g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+    for (const v of xticks) g.fillText(xfmt(v), xv(v), h - 3);
+    return { xv, yv, L, Rp, w, h };
+  }
+  function curve(g, A, x0, x1, fn, y0, y1, col) {
+    g.strokeStyle = col; g.lineWidth = 2; g.beginPath();
+    for (let i = 0; i <= 200; i++) { const x = x0 + (x1 - x0) * i / 200, y = Math.max(y0, Math.min(y1, fn(x))); i ? g.lineTo(A.xv(x), A.yv(y)) : g.moveTo(A.xv(x), A.yv(y)); }
+    g.stroke();
+  }
+  function dot(g, A, x, y, col) { g.fillStyle = col; g.beginPath(); g.arc(A.xv(x), A.yv(y), 4.5, 0, Math.PI * 2); g.fill(); }
+  function drawCharts() {
+    if (!pos.length) return;
+    const ymax = 20;
+    if (V.chB && V.chB.w) {
+      const { g, w, h } = V.chB, A = axes(g, w, h, 1.1, 2.1, 0, ymax, [0, 10, 20], [1.2, 1.4, 1.6, 1.8, 2.0], v => v + 'Å');
+      curve(g, A, 1.1, 2.1, r => 0.5 * P.kb * (r - P.r0) ** 2, 0, ymax, C.line2);
+      for (let i = 0; i < 3; i++) { const r = v3.len(v3.sub(pos[i + 1], pos[i])); dot(g, A, Math.max(1.1, Math.min(2.1, r)), Math.min(ymax, 0.5 * P.kb * (r - P.r0) ** 2), C.target); }
+    }
+    if (V.chA && V.chA.w) {
+      const { g, w, h } = V.chA, A = axes(g, w, h, 60, 180, 0, ymax, [0, 10, 20], [60, 90, 120, 150, 180], v => v + '°');
+      curve(g, A, 60, 180, t => 0.5 * P.ka * ((t - P.th0) * deg) ** 2, 0, ymax, C.line2);
+      for (let i = 0; i < 2; i++) { const t = angleOf(pos[i], pos[i + 1], pos[i + 2]) / deg; dot(g, A, Math.max(60, t), Math.min(ymax, 0.5 * P.ka * ((t - P.th0) * deg) ** 2), C.target); }
+    }
+    if (V.chD && V.chD.w) {
+      const { g, w, h } = V.chD, dmax = Math.max(10, Math.ceil(Vtor(0) / 5) * 5 + 5);
+      const A = axes(g, w, h, -180, 180, 0, dmax, [0, dmax / 2, dmax], [-180, -60, 0, 60, 180], v => v + '°');
+      // histogram of φ behind the curve (tallest bar = 60 % of the height)
+      let hm = 0; for (const v of hist) hm = Math.max(hm, v);
+      if (hm > 0) { g.fillStyle = C.bar; const bw = (A.xv(5) - A.xv(0));
+        for (let k = 0; k < 72; k++) { const x = A.xv(-180 + k * 5), hh = (A.yv(0) - A.yv(dmax)) * 0.6 * hist[k] / hm; g.fillRect(x, A.yv(0) - hh, bw - 1, hh); } }
+      curve(g, A, -180, 180, p => Vtor(p * deg), 0, dmax, C.line1);
+      const phi = dihedral(pos).phi / deg; dot(g, A, phi, Math.min(dmax, Vtor(phi * deg)), C.target);
+    }
+  }
+
+  // ---------- UI ----------
+  const $ = id => document.getElementById(id);
+  const kbFrom = s => 200 * 25 ** (s / 100), toKb = v => Math.round(100 * Math.log(v / 200) / Math.log(25));
+  const spFrom = s => 0.01 * 5000 ** (s / 100), toSp = v => Math.round(100 * Math.log(v / 0.01) / Math.log(5000));
+  const fmtSp = v => v >= 1 ? v.toFixed(v >= 10 ? 0 : 1) + ' ps' : (v * 1000).toFixed(0) + ' fs';
+  function updateUI() {
+    const r = [0, 1, 2].map(i => v3.len(v3.sub(pos[i + 1], pos[i])));
+    const th = [0, 1].map(i => angleOf(pos[i], pos[i + 1], pos[i + 2]) / deg), phi = dihedral(pos).phi / deg;
+    $('rT').textContent = temperature().toFixed(0) + ' K';
+    $('rR').textContent = r.map(x => x.toFixed(2)).join(' / ') + ' Å';
+    $('rA').textContent = th.map(x => x.toFixed(0)).join(' / ') + '°';
+    $('rD').textContent = phi.toFixed(0) + '°（' + confName(phi) + '）';
+    $('rTG').textContent = nAll ? (100 * nTrans / nAll).toFixed(0) + ' % / ' + (100 * nGauche / nAll).toFixed(0) + ' %' : '—';
+    $('rU').textContent = Ub.toFixed(1) + ' / ' + Ua.toFixed(1) + ' / ' + Ud.toFixed(1);
+    const per = 2 * Math.PI * Math.sqrt(7.01 / (UNIT * P.kb));   // μ(CH₂–CH₂) ≈ 7.0 g/mol, in ps
+    $('rP').textContent = (per * 1000).toFixed(0) + ' fs（Δt の ' + (per / P.dt).toFixed(0) + ' 倍）';
+    $('hB').textContent = 'r = ' + r[1].toFixed(2) + ' Å'; $('hA').textContent = 'θ = ' + th[0].toFixed(0) + '°';
+    $('hD').textContent = 'φ = ' + phi.toFixed(0) + '°';
+    if (exploded !== $('badge').classList.contains('boom')) syncUI();
+    else $('explain').innerHTML = explainText(phi);
+  }
+  function explainText(phi) {
+    if (exploded) return EXPLAIN.boom;
+    let ex = EXPLAIN.base + '<br>';
+    if (lastMsg === 'pluck') ex += EXPLAIN.pluck + '<br>';
+    if (P.vs === 0) ex += EXPLAIN.nov;
+    else { const a = Math.abs(phi); ex += a > 150 ? EXPLAIN.trans : a > 30 && a < 90 ? EXPLAIN.gauche : EXPLAIN.eclipsed; }
+    return ex;
+  }
+  function syncUI() {
+    $('oKb').textContent = P.kb.toFixed(0) + ' kJ/mol/Å²'; $('oR0').textContent = P.r0.toFixed(2) + ' Å';
+    $('oKa').textContent = P.ka.toFixed(0) + ' kJ/mol/rad²'; $('oTh').textContent = P.th0 + '°';
+    $('oV').textContent = '× ' + P.vs.toFixed(2); $('oT').textContent = P.T + ' K';
+    $('oSp').textContent = fmtSp(P.speed); $('oDt').textContent = (P.dt * 1000).toFixed(2) + ' fs';
+    $('sKb').value = toKb(P.kb); $('sR0').value = P.r0; $('sKa').value = P.ka; $('sTh').value = P.th0; $('sV').value = P.vs;
+    $('bPause').setAttribute('aria-pressed', String(P.paused)); $('bPause').textContent = P.paused ? '再開' : '一時停止'; $('bPause').disabled = exploded;
+    const bd = $('badge'); bd.classList.toggle('boom', exploded);
+    bd.textContent = exploded ? '爆発！ Δt が大きすぎる' : 'T = ' + P.T + ' K · Δt = ' + (P.dt * 1000).toFixed(2) + ' fs';
+    $('explain').classList.toggle('boom', exploded);
+    $('explain').innerHTML = explainText(pos.length ? dihedral(pos).phi / deg : 180);
+  }
+  function slider(id, fn) { $(id).addEventListener('input', e => { fn(+e.target.value); syncUI(); drawCharts(); }); }
+  const clearHist = () => { hist.fill(0); histN = 0; nTrans = nGauche = nAll = 0; };
+  slider('sKb', v => { P.kb = kbFrom(v); });
+  slider('sR0', v => { P.r0 = v; });
+  slider('sKa', v => { P.ka = v; clearHist(); });
+  slider('sTh', v => { P.th0 = v; clearHist(); });
+  slider('sV', v => { P.vs = v; clearHist(); });
+  slider('sT', v => { P.T = v; clearHist(); });
+  slider('sSp', v => { P.speed = spFrom(v); });
+  slider('sDt', v => { P.dt = v / 1000; });
+  $('bDef').addEventListener('click', () => { Object.assign(P, DEF); clearHist(); syncUI(); drawCharts(); });
+  $('bPluck').addEventListener('click', () => {
+    if (exploded) return;
+    const d = v3.sub(pos[2], pos[1]), r = v3.len(d), u = v3.mul(d, 0.15 / r);
+    pos[1] = v3.sub(pos[1], u); pos[2] = v3.add(pos[2], u); vel[1] = [0, 0, 0]; vel[2] = [0, 0, 0];
+    forces(); lastMsg = 'pluck'; syncUI();
+  });
+  $('bPause').addEventListener('click', () => { P.paused = !P.paused; syncUI(); });
+  $('bReset').addEventListener('click', () => { P.paused = false; reset(); syncUI(); drawCharts(); });
+
+  // drag to rotate the 3D view
+  const c3 = $('cv3'); let drag = null;
+  c3.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, yaw: view.yaw, pitch: view.pitch }; c3.setPointerCapture(e.pointerId); c3.style.cursor = 'grabbing'; });
+  c3.addEventListener('pointermove', e => { if (!drag) return;
+    view.yaw = drag.yaw + (e.clientX - drag.x) * 0.01; view.pitch = Math.max(-1.5, Math.min(1.5, drag.pitch + (e.clientY - drag.y) * 0.01)); });
+  for (const t of ['pointerup', 'pointercancel']) c3.addEventListener(t, () => { drag = null; c3.style.cursor = 'grab'; });
+
+  $('sSp').value = toSp(P.speed);
+  reset(); syncUI();
+  requestAnimationFrame(frame);
+})();
+</script>
+
+</html>

@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ジャンプで学ぶ時間積分</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=JetBrains+Mono:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<style>
+/* Layout: game screen on top, instrument panel below (controls | readout), stacks on phone */
+:root{
+  --bg:#e8edf0; --panel:#ffffff; --fg:#17212b; --muted:#5a6772; --line:#cfd8de;
+  --sky:#cfe4ef; --sky2:#eef6f9; --grid:rgba(23,33,43,.08);
+  --ground:#5e8a4e; --ground2:#456f38; --plat:#9c6e45; --plat2:#7c5433;
+  --euler:#cf3f35; --semi:#b97f08; --verlet:#2a6fbd; --theory:#17212b;
+  --btn:#f2f5f7; --btn-on:#17212b; --btn-on-fg:#ffffff;
+  --f-display:"DotGothic16","Zen Kaku Gothic New",system-ui,sans-serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f151b; --panel:#17202a; --fg:#e4ebf0; --muted:#93a2ae; --line:#2b3845;
+  --sky:#16283a; --sky2:#203a52; --grid:rgba(228,235,240,.07);
+  --ground:#3f6a35; --ground2:#2d5026; --plat:#8a6040; --plat2:#5f4029;
+  --euler:#f0675c; --semi:#e8b43a; --verlet:#5ea2ef; --theory:#e4ebf0;
+  --btn:#202b37; --btn-on:#e4ebf0; --btn-on-fg:#0f151b; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0f151b; --panel:#17202a; --fg:#e4ebf0; --muted:#93a2ae; --line:#2b3845;
+  --sky:#16283a; --sky2:#203a52; --grid:rgba(228,235,240,.07);
+  --ground:#3f6a35; --ground2:#2d5026; --plat:#8a6040; --plat2:#5f4029;
+  --euler:#f0675c; --semi:#e8b43a; --verlet:#5ea2ef; --theory:#e4ebf0;
+  --btn:#202b37; --btn-on:#e4ebf0; --btn-on-fg:#0f151b; color-scheme:dark;}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--f-body);font-size:15px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 32px}
+.wrap{max-width:1080px;margin:0 auto;display:grid;gap:16px}
+.steps{display:flex;flex-wrap:wrap;gap:6px;font-size:13px}
+.steps a{color:var(--muted);text-decoration:none;padding:2px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel)}
+.steps a:hover{border-color:var(--fg);color:var(--fg)}
+.steps a[aria-current]{color:var(--btn-on-fg);background:var(--btn-on);border-color:var(--btn-on)}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 16px}
+h1{font-family:var(--f-display);font-weight:400;font-size:clamp(24px,4vw,34px);margin:0;letter-spacing:.02em;text-wrap:balance}
+header p{margin:0;color:var(--muted)}
+.screen{position:relative;border:2px solid var(--fg);border-radius:6px;overflow:hidden;background:var(--sky)}
+canvas{display:block;width:100%;aspect-ratio:16/7.5;max-width:100%;touch-action:none}
+.hint{position:absolute;left:10px;top:8px;font-family:var(--f-display);font-size:13px;color:var(--fg);opacity:.75;pointer-events:none}
+.pad{display:flex;gap:8px;justify-content:center}
+.pad button{font-family:var(--f-display);font-size:18px;min-width:64px;padding:10px 14px}
+.grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px}
+@media (max-width:760px){.grid{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;display:grid;gap:14px;min-width:0}
+.label{font-size:12px;letter-spacing:.08em;color:var(--muted);font-weight:700}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+button{font-family:var(--f-body);font-size:14px;font-weight:700;color:var(--fg);background:var(--btn);border:1px solid var(--line);border-radius:6px;padding:8px 12px;cursor:pointer}
+button:hover{border-color:var(--fg)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--verlet);outline-offset:2px}
+button[aria-pressed="true"]{background:var(--btn-on);color:var(--btn-on-fg);border-color:var(--btn-on)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:0}
+.slider{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;align-items:center}
+.slider label{font-weight:700}
+.slider output{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:14px}
+.slider input{grid-column:1/-1;width:100%}
+.slider small{grid-column:1/-1;color:var(--muted);font-size:12px}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{text-align:right;padding:6px 4px;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font-size:12px;color:var(--muted);font-weight:700}
+td{font-family:var(--f-mono);font-size:14px}
+td:first-child{font-family:var(--f-body);font-weight:700}
+.err-up{color:var(--euler)} .err-down{color:var(--semi)} .err-ok{color:var(--verlet)}
+.tablewrap{overflow-x:auto}
+.formulas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:760px){.formulas{grid-template-columns:minmax(0,1fr)}}
+.f{border:1px solid var(--line);border-radius:6px;padding:10px 12px;opacity:.55;transition:opacity .15s}
+.f.on{opacity:1;border-color:var(--c)}
+.f h3{margin:0 0 6px;font-size:14px;color:var(--c)}
+.f pre{margin:0;font-family:var(--f-mono);font-size:12.5px;line-height:1.55;overflow-x:auto}
+.f p{margin:6px 0 0;font-size:12.5px;color:var(--muted)}
+.note{font-size:13px;color:var(--muted);margin:0}
+canvas.chart{aspect-ratio:auto;height:150px;touch-action:auto}
+canvas.mol{aspect-ratio:16/4.2;border:1px solid var(--line);border-radius:6px;background:var(--sky2);touch-action:auto}
+.molgrid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:760px){.molgrid{grid-template-columns:minmax(0,1fr)}}
+@media (prefers-reduced-motion:reduce){.f{transition:none}}
+</style>
+
+<div class="wrap">
+  <nav class="steps" aria-label="講義の段階"><a href="index.html">講義の流れ</a><a href="lj-box.html#force">1 力場</a><a href="jump-integrator.html" aria-current="page">2 時間積分</a><a href="thermo-room.html">3 温度・圧力</a><a href="lj-box.html#props">4 物性へ</a><a href="molecule.html">＋ 小分子</a><a href="polymer.html">＋ 高分子</a></nav>
+  <header>
+    <h1>ジャンプで学ぶ時間積分</h1>
+    <p>同じ重力・同じ初速でも、積分法と Δt でジャンプの高さが変わる。</p>
+  </header>
+
+  <div class="screen">
+    <canvas id="cv" tabindex="0" aria-label="ゲーム画面。矢印キーで移動、スペースでジャンプ"></canvas>
+    <div class="hint" id="hint">← → 移動 ／ Space ジャンプ</div>
+  </div>
+  <div class="pad" aria-label="タッチ操作">
+    <button id="bL" aria-label="左へ移動">◀</button>
+    <button id="bJ" aria-label="ジャンプ">JUMP</button>
+    <button id="bR" aria-label="右へ移動">▶</button>
+  </div>
+
+  <div class="grid">
+    <section class="card" aria-label="設定">
+      <div>
+        <div class="label">時間積分法</div>
+        <div class="seg" id="methodSeg">
+          <button data-m="euler"><span class="dot" style="background:var(--euler)"></span>オイラー法</button>
+          <button data-m="semi"><span class="dot" style="background:var(--semi)"></span>半陰的オイラー法</button>
+          <button data-m="verlet"><span class="dot" style="background:var(--verlet)"></span>速度ベレ法</button>
+        </div>
+      </div>
+      <div class="slider">
+        <label for="sDt">時間刻み Δt</label><output id="oDt"></output>
+        <input type="range" id="sDt" min="0" max="100" step="1" value="72">
+        <small>0.001 s 〜 0.25 s。大きくすると1ステップの移動がカクカクになる。</small>
+      </div>
+      <div class="slider">
+        <label for="sG">重力加速度 g</label><output id="oG"></output>
+        <input type="range" id="sG" min="2" max="20" step="0.1" value="9.8">
+      </div>
+      <div class="slider">
+        <label for="sV">ジャンプ初速 v₀</label><output id="oV"></output>
+        <input type="range" id="sV" min="3" max="10" step="0.1" value="7">
+      </div>
+      <div class="seg">
+        <button id="bCompare" aria-pressed="false">3つ同時に比較</button>
+        <button id="bSlow" aria-pressed="false">スロー ×¼</button>
+        <button id="bTrail" aria-pressed="true">軌跡を表示</button>
+        <button id="bReset">リセット</button>
+      </div>
+    </section>
+
+    <section class="card" aria-label="測定結果">
+      <div>
+        <div class="label">最高到達点（踏み切りからの高さ）</div>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>方法</th><th>測定</th><th>理論 v₀²/2g</th><th>誤差</th></tr></thead>
+            <tbody id="tb"></tbody>
+          </table>
+        </div>
+      </div>
+      <div>
+        <div class="label">エネルギー保存と時間反転（ジャンプ中）</div>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>方法</th><th>エネルギーのずれ ΔE/E₀</th><th>逆回しの戻り誤差</th></tr></thead>
+            <tbody id="tb2"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="seg">
+        <button id="bRev">時間を逆回し（飛んでいる間に押す）</button>
+      </div>
+      <p class="note">点線＝理論の最高点。軌跡の点1つ＝1ステップ。Δt を 0.1 s 以上にすると差がはっきり見える。<br>逆回し＝速度を反対向きにする。正しく戻れば、踏み切った点にぴったり着地する（戻り誤差 0）。逆回し中はキーを押さない。</p>
+    </section>
+  </div>
+
+  <section class="card" aria-label="エネルギーのグラフ">
+    <div class="label">ジャンプ中のエネルギー（踏み切りからの時間）：ΔE/E₀ = (½v² + g·h − ½v₀²) / ½v₀²</div>
+    <canvas id="chE" class="chart"></canvas>
+  </section>
+
+  <section class="card" aria-label="分子の振動">
+    <div class="label">分子の振動で比べる：バネでつながった2原子（周期 1 s）。Δt は上のスライダーと共通</div>
+    <canvas id="cvM" class="mol"></canvas>
+    <div class="molgrid">
+      <canvas id="chM" class="chart"></canvas>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>方法</th><th>エネルギー E/E₀</th><th>逆回しの戻り誤差</th></tr></thead>
+          <tbody id="tb3"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="seg">
+      <button id="bPluck">はじく（振動をはじめから）</button>
+      <button id="bRevM">時間を逆回しテスト（2秒進めて、2秒戻す）</button>
+    </div>
+    <p class="note" id="molNote">オイラー法は振動がどんどん大きくなる（エネルギーが増える）。速度ベレ法はエネルギーがほぼ一定で、逆回しすると元の位置にもどる。</p>
+  </section>
+
+  <section class="card" aria-label="更新式">
+    <div class="label">1ステップの更新式（a = 加速度）</div>
+    <div class="formulas">
+      <div class="f" id="f-euler" style="--c:var(--euler)">
+        <h3>オイラー法</h3>
+<pre>x ← x + v·Δt
+v ← v + a·Δt</pre>
+        <p>古い速度で位置を進める。ジャンプが<b>高すぎる</b>。</p>
+      </div>
+      <div class="f" id="f-semi" style="--c:var(--semi)">
+        <h3>半陰的オイラー法</h3>
+<pre>v ← v + a·Δt
+x ← x + v·Δt</pre>
+        <p>順番を入れ替えただけ。ジャンプが<b>低すぎる</b>。多くのゲームはこれ。</p>
+      </div>
+      <div class="f" id="f-verlet" style="--c:var(--verlet)">
+        <h3>速度ベレ法</h3>
+<pre>x ← x + v·Δt + ½a·Δt²
+v ← v + ½(a + a_new)·Δt</pre>
+        <p>重力一定なら<b>ステップ上の位置は厳密</b>。MDの標準。</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const NAMES = { euler: 'オイラー法', semi: '半陰的オイラー', verlet: '速度ベレ法' };
+  const COLORVAR = { euler: '--euler', semi: '--semi', verlet: '--verlet' };
+  const P = { dt: 0.05, g: 9.8, v0: 7, slow: false, trail: true, compare: false, method: 'verlet' };
+  const WORLD_W = 16, GROUND_T = 0.6, SIZE = 0.6;
+  const PLATFORMS = [{ x: 3, y: 2.2, w: 3 }, { x: 9.5, y: 3.6, w: 3.2 }];
+
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  let cw = 0, ch = 0, S = 1, WORLD_H = 7;
+
+  function resize() {
+    const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    cw = r.width; ch = r.height;
+    cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    S = cw / WORLD_W; WORLD_H = ch / S - GROUND_T;
+  }
+  new ResizeObserver(resize).observe(cv);
+
+  // ---- bodies ----
+  function makeBody(x, method) {
+    return { x, y: 0, vx: 0, vy: 0, method, onGround: true, jumpY: 0, maxY: 0,
+             trail: [], peak: null, airborne: false, face: 1,
+             launchX: x, steps: 0, eTrace: [], dE: null, rev: null, revErr: null, reversed: false };
+  }
+  let bodies = [];
+  function reset() {
+    if (P.compare) {
+      bodies = ['euler', 'semi', 'verlet'].map((m, i) => makeBody(3 + i * 4.5, m));
+    } else {
+      bodies = [makeBody(1.2, P.method)];
+    }
+    acc = 0;
+  }
+
+  // ---- physics ----
+  const keys = { L: false, R: false };
+  let jumpQueued = false;
+
+  function accel(b, vx, input) {
+    const ax = b.onGround ? input * 30 - 8 * vx : input * 12;
+    const ay = b.onGround ? 0 : -P.g;
+    return { ax, ay };
+  }
+  function surfaces() {
+    const s = [{ x: 0, y: 0, w: WORLD_W }];
+    if (!P.compare) s.push(...PLATFORMS);
+    return s;
+  }
+  function overlaps(b, s) { return b.x + SIZE > s.x && b.x < s.x + s.w; }
+
+  function step(b, dt, input) {
+    if (jumpQueued && b.onGround) {
+      b.vy = P.v0; b.onGround = false; b.airborne = true;
+      b.jumpY = b.y; b.maxY = b.y; b.trail = [{ x: b.x, y: b.y }];
+      b.launchX = b.x; b.steps = 0; b.eTrace = [[0, 0]]; b.dE = 0; b.rev = null; b.revErr = null; b.reversed = false;
+    }
+    if (b.rev) input = 0;   // the reversal test needs the same forces both ways
+    const prevY = b.y;
+    const a = accel(b, b.vx, input);
+    if (b.method === 'euler') {
+      b.x += b.vx * dt; b.y += b.vy * dt;
+      b.vx += a.ax * dt; b.vy += a.ay * dt;
+    } else if (b.method === 'semi') {
+      b.vx += a.ax * dt; b.vy += a.ay * dt;
+      b.x += b.vx * dt; b.y += b.vy * dt;
+    } else {
+      b.x += b.vx * dt + 0.5 * a.ax * dt * dt;
+      b.y += b.vy * dt + 0.5 * a.ay * dt * dt;
+      const hx = b.vx + 0.5 * a.ax * dt, hy = b.vy + 0.5 * a.ay * dt;
+      const a2 = accel(b, hx, input);
+      b.vx = hx + 0.5 * a2.ax * dt; b.vy = hy + 0.5 * a2.ay * dt;
+    }
+    // walls
+    if (b.x < 0) { b.x = 0; b.vx = 0; }
+    if (b.x > WORLD_W - SIZE) { b.x = WORLD_W - SIZE; b.vx = 0; }
+    if (Math.abs(b.vx) > 0.05) b.face = Math.sign(b.vx);
+
+    if (b.onGround) {
+      // walked off a ledge?
+      const support = surfaces().some(s => Math.abs(s.y - b.y) < 1e-6 && overlaps(b, s));
+      if (!support) { b.onGround = false; b.airborne = true; b.vy = 0;
+        b.jumpY = b.y; b.maxY = b.y; b.trail = [{ x: b.x, y: b.y }];
+        b.eTrace = []; b.dE = null; b.rev = null; b.reversed = false; }   // a fall, not a jump: no energy check
+    } else {
+      if (!b.reversed && b.y > b.maxY) b.maxY = b.y;
+      if (P.trail && b.trail.length < 3000) b.trail.push({ x: b.x, y: b.y });
+      // vertical energy per unit mass relative to take-off: ½v_y² + g(y − y_jump) should stay ½v₀²
+      if (b.airborne && b.eTrace.length) {
+        b.steps++;
+        const E0 = 0.5 * P.v0 * P.v0;
+        b.dE = (0.5 * b.vy * b.vy + P.g * (b.y - b.jumpY) - E0) / E0;
+        if (b.eTrace.length < 4000) b.eTrace.push([b.steps * dt, b.dE]);
+      }
+      if (b.rev && ++b.rev.k >= b.rev.n) { b.revErr = Math.hypot(b.x - b.rev.x0, b.y - b.rev.y0); b.rev = null; }
+      if (b.y <= prevY) {
+        for (const s of surfaces()) {
+          if (prevY >= s.y - 1e-9 && b.y <= s.y && overlaps(b, s)) {
+            if (b.rev) { b.revErr = Math.hypot(b.x - b.rev.x0, b.y - b.rev.y0); b.rev = null; }   // landed before it got back
+            b.y = s.y; b.vy = 0; b.onGround = true;
+            if (b.airborne && !b.reversed) b.peak = b.maxY - b.jumpY;
+            b.airborne = false;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  function physics(dt) {
+    const input = (keys.R ? 1 : 0) - (keys.L ? 1 : 0);   // in 比較 mode all three move together
+    for (const b of bodies) step(b, dt, input);
+    jumpQueued = false;
+    molPhysics(dt);
+  }
+
+  // ---- molecule: two atoms on a spring (1D), one copy per method; m = 1 ----
+  const K_MOL = 2 * Math.PI * Math.PI, L0 = 1, A_MOL = 0.35;   // ω = √(2k/m) = 2π → period 1 s
+  const E0M = 0.5 * K_MOL * A_MOL * A_MOL;
+  let mols = [], revM = null;           // revM: running reversal test {phase, k, n, snap}
+  function pluck() {
+    mols = ['euler', 'semi', 'verlet'].map(m => ({ m, x1: -(L0 + A_MOL) / 2, x2: (L0 + A_MOL) / 2, v1: 0, v2: 0,
+      boom: false, hist: [], revErr: null }));
+    revM = null;
+  }
+  const molE = q => 0.5 * (q.v1 * q.v1 + q.v2 * q.v2) + 0.5 * K_MOL * (q.x2 - q.x1 - L0) ** 2;
+  function molStep(q, dt) {
+    if (q.boom) return;
+    const acc1 = (x1, x2) => K_MOL * (x2 - x1 - L0);   // force on atom 1 (atom 2 gets the opposite)
+    if (q.m === 'euler') {
+      const a = acc1(q.x1, q.x2);
+      q.x1 += q.v1 * dt; q.x2 += q.v2 * dt; q.v1 += a * dt; q.v2 -= a * dt;
+    } else if (q.m === 'semi') {
+      const a = acc1(q.x1, q.x2);
+      q.v1 += a * dt; q.v2 -= a * dt; q.x1 += q.v1 * dt; q.x2 += q.v2 * dt;
+    } else {
+      const a = acc1(q.x1, q.x2);
+      q.x1 += q.v1 * dt + 0.5 * a * dt * dt; q.x2 += q.v2 * dt - 0.5 * a * dt * dt;
+      const a2 = acc1(q.x1, q.x2);
+      q.v1 += 0.5 * (a + a2) * dt; q.v2 -= 0.5 * (a + a2) * dt;
+    }
+    if (!(molE(q) < 60 * E0M)) q.boom = true;   // ran away (or NaN): stop it
+  }
+  function molPhysics(dt) {
+    for (const q of mols) molStep(q, dt);
+    if (revM && ++revM.k >= revM.n) {
+      for (const q of mols) { q.v1 = -q.v1; q.v2 = -q.v2; }
+      if (revM.phase === 'fwd') { revM.phase = 'back'; revM.k = 0; }
+      else {
+        mols.forEach((q, i) => { const s = revM.snap[i];
+          q.revErr = q.boom || s.boom ? Infinity : Math.max(Math.abs(q.x1 - s.x1), Math.abs(q.x2 - s.x2)); });
+        revM = null; syncUI();
+      }
+    }
+  }
+
+  // ---- loop ----
+  let acc = 0, last = performance.now(), lastUI = 0, lastMol = 0;
+  function frame(now) {
+    const real = Math.min(0.1, (now - last) / 1000); last = now;
+    acc += real * (P.slow ? 0.25 : 1);
+    let n = 0;
+    while (acc >= P.dt && n < 2000) { physics(P.dt); acc -= P.dt; n++; }
+    if (n >= 2000) acc = 0;
+    if (now - lastMol > 50) {
+      lastMol = now;
+      for (const q of mols) { q.hist.push(q.boom ? Infinity : molE(q) / E0M); if (q.hist.length > 200) q.hist.shift(); }
+    }
+    draw(); drawMol();
+    if (now - lastUI > 100) { updateTable(); drawECharts(); lastUI = now; }
+    requestAnimationFrame(frame);
+  }
+
+  // ---- drawing ----
+  let C = {};
+  function readColors() {
+    const cs = getComputedStyle(document.documentElement);
+    for (const k of ['sky','sky2','grid','ground','ground2','plat','plat2','euler','semi','verlet','theory','fg','muted'])
+      C[k] = cs.getPropertyValue('--' + k).trim();
+  }
+  readColors();
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+  new MutationObserver(readColors).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] });
+
+  const X = x => x * S;
+  const Y = y => ch - (y + GROUND_T) * S;
+
+  function draw() {
+    if (!cw) return;
+    const g = ctx.createLinearGradient(0, 0, 0, ch);
+    g.addColorStop(0, C.sky); g.addColorStop(1, C.sky2);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, cw, ch);
+
+    // meter grid
+    ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
+    ctx.fillStyle = C.muted; ctx.font = '11px "JetBrains Mono", monospace'; ctx.textBaseline = 'middle';
+    for (let m = 1; m <= Math.floor(WORLD_H); m++) {
+      const y = Math.round(Y(m)) + 0.5;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cw, y); ctx.stroke();
+      ctx.fillText(m + ' m', cw - 36, y - 8);
+    }
+    for (let m = 1; m < WORLD_W; m++) {
+      const x = Math.round(X(m)) + 0.5;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, Y(0)); ctx.stroke();
+    }
+
+    // ground
+    ctx.fillStyle = C.ground; ctx.fillRect(0, Y(0), cw, GROUND_T * S);
+    ctx.fillStyle = C.ground2; ctx.fillRect(0, Y(0), cw, Math.max(3, S * 0.12));
+
+    // platforms
+    if (!P.compare) for (const p of PLATFORMS) {
+      ctx.fillStyle = C.plat; ctx.fillRect(X(p.x), Y(p.y), p.w * S, S * 0.35);
+      ctx.fillStyle = C.plat2; ctx.fillRect(X(p.x), Y(p.y), p.w * S, Math.max(2, S * 0.08));
+    }
+
+    for (const b of bodies) {
+      const col = C[b.method];
+      // theory line
+      if (b.airborne || b.peak !== null) {
+        const ty = b.jumpY + P.v0 * P.v0 / (2 * P.g);
+        const x0 = X(b.x + SIZE / 2) - S * 1.4, x1 = X(b.x + SIZE / 2) + S * 1.4;
+        ctx.save(); ctx.setLineDash([6, 5]); ctx.strokeStyle = C.theory; ctx.globalAlpha = .7; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(x0, Y(ty)); ctx.lineTo(x1, Y(ty)); ctx.stroke(); ctx.restore();
+        if (!b.airborne) {
+          const my = b.jumpY + b.peak;
+          ctx.strokeStyle = col; ctx.lineWidth = 2.5;
+          ctx.beginPath(); ctx.moveTo(x0 + S * .4, Y(my)); ctx.lineTo(x1 - S * .4, Y(my)); ctx.stroke();
+        }
+      }
+      // trail
+      if (P.trail) {
+        ctx.fillStyle = col;
+        const r = Math.max(2, Math.min(4, S * 0.07));
+        for (const p of b.trail) {
+          ctx.beginPath(); ctx.arc(X(p.x + SIZE / 2), Y(p.y + SIZE / 2), r, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      drawChar(b, col);
+      if (P.compare) {
+        ctx.fillStyle = C.fg; ctx.font = '600 ' + Math.max(11, S * 0.32) + 'px "Zen Kaku Gothic New", sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        ctx.fillText(NAMES[b.method], X(b.x + SIZE / 2), Y(0) + 6);
+        ctx.textAlign = 'left';
+      }
+    }
+  }
+
+  function drawChar(b, col) {
+    const x = X(b.x), y = Y(b.y + SIZE), w = SIZE * S, h = SIZE * S, r = w * 0.28;
+    ctx.fillStyle = col; ctx.strokeStyle = C.fg; ctx.lineWidth = Math.max(1.5, S * 0.04);
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill(); ctx.stroke();
+    // eyes
+    const ex = x + w * (b.face > 0 ? 0.58 : 0.22), ey = y + h * 0.32;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(ex, ey, w * 0.14, h * 0.24); ctx.fillRect(ex + w * 0.2, ey, w * 0.14, h * 0.24);
+    ctx.fillStyle = '#111111';
+    const px = b.face > 0 ? w * 0.06 : 0, py = b.vy > 0.5 ? 0 : h * 0.1;
+    ctx.fillRect(ex + px, ey + py, w * 0.08, h * 0.12); ctx.fillRect(ex + w * 0.2 + px, ey + py, w * 0.08, h * 0.12);
+  }
+
+  // ---- molecule view and the two energy charts ----
+  function fitCanvas(c) {
+    const r = c.getBoundingClientRect(), dpr = window.devicePixelRatio || 1, g = c.getContext('2d');
+    c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr);
+    g.setTransform(dpr, 0, 0, dpr, 0, 0); return { g, w: r.width, h: r.height };
+  }
+  const cvM = document.getElementById('cvM'), chE = document.getElementById('chE'), chM = document.getElementById('chM');
+  let VM = { w: 0 }, VE = { w: 0 }, VC = { w: 0 };
+  new ResizeObserver(() => { VM = fitCanvas(cvM); VE = fitCanvas(chE); VC = fitCanvas(chM); drawECharts(); })
+    .observe(document.querySelector('.wrap'));
+  function drawMol() {
+    const { g, w, h } = VM; if (!w) return;
+    g.clearRect(0, 0, w, h);
+    const rowH = h / 3, sc = w / 7, cx = w * 0.58;
+    mols.forEach((q, i) => {
+      const y = rowH * (i + 0.5), col = C[q.m];
+      g.fillStyle = col; g.font = '700 ' + Math.max(12, rowH * 0.26) + 'px "Zen Kaku Gothic New", sans-serif';
+      g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(NAMES[q.m], 12, y);
+      if (q.boom) { g.fillStyle = C.euler; g.textAlign = 'center'; g.fillText('発散！ エネルギーが増え続けた', cx, y); return; }
+      const x1 = cx + q.x1 * sc, x2 = cx + q.x2 * sc, rad = Math.min(rowH * 0.28, sc * 0.18);
+      // spring as a zigzag between the atoms
+      g.strokeStyle = C.muted; g.lineWidth = 2; g.beginPath(); g.moveTo(x1, y);
+      const nz = 10; for (let k = 1; k < nz; k++) g.lineTo(x1 + (x2 - x1) * k / nz, y + (k % 2 ? -1 : 1) * rad * 0.6);
+      g.lineTo(x2, y); g.stroke();
+      for (const x of [x1, x2]) { g.fillStyle = col; g.strokeStyle = C.fg; g.lineWidth = 1.5; g.beginPath(); g.arc(x, y, rad, 0, Math.PI * 2); g.fill(); g.stroke(); }
+    });
+    g.save(); g.setLineDash([4, 4]); g.strokeStyle = C.grid; g.beginPath(); g.moveTo(cx - L0 / 2 * sc, 0); g.lineTo(cx - L0 / 2 * sc, h);
+    g.moveTo(cx + L0 / 2 * sc, 0); g.lineTo(cx + L0 / 2 * sc, h); g.stroke(); g.restore();
+  }
+  function plotAxes(g, w, h, y0, y1, ticks, fmt) {
+    const L = 46, B = 16, T = 8, Rp = 8, yv = v => T + (h - T - B) * (y1 - v) / (y1 - y0);
+    g.clearRect(0, 0, w, h); g.strokeStyle = C.grid; g.fillStyle = C.muted; g.lineWidth = 1;
+    g.font = '11px "JetBrains Mono", monospace'; g.textAlign = 'right'; g.textBaseline = 'middle';
+    for (const v of ticks) { const y = Math.round(yv(v)) + .5; g.beginPath(); g.moveTo(L, y); g.lineTo(w - Rp, y); g.stroke(); g.fillText(fmt(v), L - 4, y); }
+    return { L, Rp, B, yv, xv: (v, x0, x1) => L + (w - L - Rp) * (v - x0) / (x1 - x0) };
+  }
+  function drawECharts() {
+    if (VE.w) {   // jump: ΔE/E₀ in % against time since take-off
+      const { g, w, h } = VE, tf = 2 * P.v0 / P.g * 1.05;
+      let m = 1; for (const b of bodies) for (const [, e] of b.eTrace) m = Math.max(m, Math.abs(e * 100));
+      m = Math.ceil(m * 1.15);
+      const A = plotAxes(g, w, h, -m, m, [-m, 0, m], v => (v > 0 ? '+' : '') + v + '%');
+      for (const b of bodies) {
+        g.strokeStyle = C[b.method]; g.lineWidth = 2; g.beginPath();
+        b.eTrace.forEach(([t, e], i) => { const x = A.xv(Math.min(t, tf), 0, tf), y = A.yv(Math.max(-m, Math.min(m, e * 100))); i ? g.lineTo(x, y) : g.moveTo(x, y); });
+        g.stroke();
+      }
+      g.fillStyle = C.muted; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+      g.fillText('踏み切り', A.L + 2, h - 3); g.textAlign = 'right'; g.fillText('着地（' + tf.toFixed(1) + ' s）', w - A.Rp, h - 3);
+    }
+    if (VC.w) {   // molecule: E/E₀ over the last 10 s
+      const { g, w, h } = VC;
+      const A = plotAxes(g, w, h, 0, 2, [0, 0.5, 1, 1.5, 2], v => v.toFixed(1));
+      g.save(); g.setLineDash([5, 4]); g.strokeStyle = C.theory; g.beginPath(); g.moveTo(A.L, A.yv(1)); g.lineTo(w - A.Rp, A.yv(1)); g.stroke(); g.restore();
+      for (const q of mols) {
+        g.strokeStyle = C[q.m]; g.lineWidth = 2; g.beginPath();
+        q.hist.forEach((e, i) => { const x = A.xv(i, 0, 199), y = A.yv(Math.min(2, e)); i ? g.lineTo(x, y) : g.moveTo(x, y); });
+        g.stroke();
+      }
+      g.fillStyle = C.muted; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+      g.fillText('E/E₀（過去 10 s、点線 = 1）', A.L + 2, h - 3);
+    }
+  }
+  const fmtErr = e => e === null || e === undefined ? '—' : !isFinite(e) ? '発散' : e < 1e-9 ? '≈ 0' : e.toExponential(1);
+
+  // ---- table ----
+  const tb = document.getElementById('tb');
+  function updateTable() {
+    const th = P.v0 * P.v0 / (2 * P.g);
+    tb.innerHTML = bodies.map(b => {
+      const meas = b.airborne ? b.maxY - b.jumpY : b.peak;
+      let m = '—', e = '—', cls = '';
+      if (meas !== null && meas !== undefined) {
+        m = meas.toFixed(3) + ' m';
+        const pct = (meas - th) / th * 100;
+        e = (pct >= 0 ? '+' : '') + pct.toFixed(1) + ' %';
+        cls = Math.abs(pct) < 3 ? 'err-ok' : pct > 0 ? 'err-up' : 'err-down';
+        if (b.airborne) m += '…';
+      }
+      return `<tr><td><span class="dot" style="background:var(${COLORVAR[b.method]})"></span>${NAMES[b.method]}</td>` +
+             `<td>${m}</td><td>${th.toFixed(3)} m</td><td class="${cls}">${e}</td></tr>`;
+    }).join('');
+    const dot = m => `<span class="dot" style="background:var(${COLORVAR[m]})"></span>${NAMES[m]}`;
+    document.getElementById('tb2').innerHTML = bodies.map(b => {
+      const de = b.dE === null ? '—' : (b.dE >= 0 ? '+' : '') + (b.dE * 100).toFixed(2) + ' %';
+      const re = b.rev ? '戻り中…' : b.revErr === null ? '—' : fmtErr(b.revErr) + (isFinite(b.revErr) && b.revErr >= 1e-9 ? ' m' : '');
+      return `<tr><td>${dot(b.method)}</td><td>${de}</td><td>${re}</td></tr>`;
+    }).join('');
+    document.getElementById('tb3').innerHTML = mols.map(q => {
+      const e = q.boom ? '発散' : (molE(q) / E0M).toFixed(3);
+      const re = revM ? 'テスト中…' : fmtErr(q.revErr);
+      return `<tr><td>${dot(q.m)}</td><td>${e}</td><td>${re}</td></tr>`;
+    }).join('');
+  }
+
+  // ---- controls ----
+  const $ = id => document.getElementById(id);
+  const dtFromSlider = s => 0.001 * Math.pow(250, s / 100);
+  function syncUI() {
+    $('oDt').textContent = P.dt.toFixed(3) + ' s';
+    $('oG').textContent = P.g.toFixed(1) + ' m/s²';
+    $('oV').textContent = P.v0.toFixed(1) + ' m/s';
+    document.querySelectorAll('#methodSeg button').forEach(btn => {
+      btn.setAttribute('aria-pressed', String(!P.compare && btn.dataset.m === P.method));
+      btn.disabled = P.compare;
+    });
+    $('bCompare').setAttribute('aria-pressed', String(P.compare));
+    $('bSlow').setAttribute('aria-pressed', String(P.slow));
+    $('bTrail').setAttribute('aria-pressed', String(P.trail));
+    for (const m of ['euler', 'semi', 'verlet'])
+      $('f-' + m).classList.toggle('on', P.compare || P.method === m);
+    $('hint').textContent = P.compare ? '← → で3体いっしょに移動 ／ Space で同時ジャンプ' : '← → 移動 ／ Space ジャンプ';
+    $('bRevM').disabled = !!revM;
+  }
+  $('sDt').addEventListener('input', e => { P.dt = dtFromSlider(+e.target.value); syncUI(); });
+  $('sG').addEventListener('input', e => { P.g = +e.target.value; syncUI(); });
+  $('sV').addEventListener('input', e => { P.v0 = +e.target.value; syncUI(); });
+  document.querySelectorAll('#methodSeg button').forEach(btn => btn.addEventListener('click', () => {
+    P.method = btn.dataset.m; for (const b of bodies) b.method = P.method; syncUI();
+  }));
+  $('bCompare').addEventListener('click', () => { P.compare = !P.compare; reset(); syncUI(); });
+  $('bSlow').addEventListener('click', () => { P.slow = !P.slow; syncUI(); });
+  $('bTrail').addEventListener('click', () => { P.trail = !P.trail; syncUI(); });
+  $('bReset').addEventListener('click', () => { reset(); syncUI(); });
+  // time reversal of the jump: flip the velocity of every airborne body; it should land where it took off
+  $('bRev').addEventListener('click', () => {
+    for (const b of bodies) if (b.airborne && !b.rev && b.eTrace.length) {
+      b.vx = -b.vx; b.vy = -b.vy; b.rev = { n: b.steps, k: 0, x0: b.launchX, y0: b.jumpY }; b.reversed = true;
+    }
+  });
+  $('bPluck').addEventListener('click', () => { pluck(); syncUI(); });
+  $('bRevM').addEventListener('click', () => {
+    if (revM) return;
+    revM = { phase: 'fwd', k: 0, n: Math.max(1, Math.round(2 / P.dt)),
+             snap: mols.map(q => ({ x1: q.x1, x2: q.x2, boom: q.boom })) };
+    for (const q of mols) q.revErr = null;
+    syncUI();
+  });
+
+  addEventListener('keydown', e => {
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (tag === 'INPUT' && (e.key.startsWith('Arrow'))) return;
+    if (e.key === 'ArrowLeft' || e.key === 'a') { keys.L = true; e.preventDefault(); }
+    else if (e.key === 'ArrowRight' || e.key === 'd') { keys.R = true; e.preventDefault(); }
+    else if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w') {
+      if (tag === 'BUTTON' && e.key === ' ') return;
+      if (!e.repeat) jumpQueued = true; e.preventDefault();
+    }
+  });
+  addEventListener('keyup', e => {
+    if (e.key === 'ArrowLeft' || e.key === 'a') keys.L = false;
+    if (e.key === 'ArrowRight' || e.key === 'd') keys.R = false;
+  });
+  function hold(id, k) {
+    const el = $(id);
+    el.addEventListener('pointerdown', e => { keys[k] = true; el.setPointerCapture(e.pointerId); });
+    for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) el.addEventListener(t, () => keys[k] = false);
+  }
+  hold('bL', 'L'); hold('bR', 'R');
+  $('bJ').addEventListener('pointerdown', () => { jumpQueued = true; });
+  cv.addEventListener('pointerdown', () => { cv.focus(); jumpQueued = true; });
+
+  P.dt = dtFromSlider(+$('sDt').value);
+  pluck(); reset(); syncUI(); resize();
+  requestAnimationFrame(frame);
+})();
+</script>
+
+</html>

@@ -1,0 +1,774 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LJ粒子の箱</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=JetBrains+Mono:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<style>
+/* Layout: box screen on top, charts strip (U(r) | g(r) | T), then controls | readout; stacks on phone */
+:root{
+  --bg:#e8edf0; --panel:#ffffff; --fg:#17212b; --muted:#5a6772; --line:#cfd8de;
+  --room:#f4f7f9; --room2:#e3ebf0; --grid:rgba(23,33,43,.07);
+  --wall:#3b4752; --hero:#2a6fbd; --target:#cf3f35; --line1:#2a6fbd; --line2:#b97f08; --part:#6f8fb0;
+  --btn:#f2f5f7; --btn-on:#17212b; --btn-on-fg:#ffffff;
+  --f-display:"DotGothic16","Zen Kaku Gothic New",system-ui,sans-serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f151b; --panel:#17202a; --fg:#e4ebf0; --muted:#93a2ae; --line:#2b3845;
+  --room:#141d26; --room2:#1b2733; --grid:rgba(228,235,240,.06);
+  --wall:#a9b6c1; --hero:#5ea2ef; --target:#f0675c; --line1:#5ea2ef; --line2:#e8b43a; --part:#7f9cbb;
+  --btn:#202b37; --btn-on:#e4ebf0; --btn-on-fg:#0f151b; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0f151b; --panel:#17202a; --fg:#e4ebf0; --muted:#93a2ae; --line:#2b3845;
+  --room:#141d26; --room2:#1b2733; --grid:rgba(228,235,240,.06);
+  --wall:#a9b6c1; --hero:#5ea2ef; --target:#f0675c; --line1:#5ea2ef; --line2:#e8b43a; --part:#7f9cbb;
+  --btn:#202b37; --btn-on:#e4ebf0; --btn-on-fg:#0f151b; color-scheme:dark;}
+body[data-stage="force"] .only-props{display:none!important}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--f-body);font-size:15px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 32px}
+.wrap{max-width:1080px;margin:0 auto;display:grid;gap:16px}
+.steps{display:flex;flex-wrap:wrap;gap:6px;font-size:13px}
+.steps a{color:var(--muted);text-decoration:none;padding:2px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel)}
+.steps a:hover{border-color:var(--fg);color:var(--fg)}
+.steps a[aria-current]{color:var(--btn-on-fg);background:var(--btn-on);border-color:var(--btn-on)}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 16px}
+h1{font-family:var(--f-display);font-weight:400;font-size:clamp(24px,4vw,34px);margin:0;letter-spacing:.02em}
+header p{margin:0;color:var(--muted)}
+.screen{position:relative;border:2px solid var(--fg);border-radius:6px;overflow:hidden;background:var(--room)}
+#cv{display:block;width:100%;aspect-ratio:20/10.5;max-width:100%;touch-action:none;cursor:crosshair}
+.hint{position:absolute;left:10px;top:8px;font-family:var(--f-display);font-size:13px;opacity:.7;pointer-events:none}
+.badge{position:absolute;right:10px;top:8px;font-family:var(--f-display);font-size:16px;padding:2px 10px;border:2px solid var(--fg);border-radius:4px;background:var(--panel)}
+@media (max-width:560px){.hint{display:none}}
+.pad{display:flex;gap:8px;justify-content:center}
+.pad button{font-family:var(--f-display);font-size:18px;min-width:64px;padding:10px 14px}
+.charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media (max-width:760px){.charts{grid-template-columns:minmax(0,1fr)}}
+.chart{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-width:0}
+.chart canvas{display:block;width:100%;height:130px}
+.chart.wide{grid-column:1/-1}
+.chart .head{display:flex;justify-content:space-between;gap:8px;font-size:13px}
+.chart .head b{font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px}
+@media (max-width:760px){.grid{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;display:grid;gap:14px;min-width:0;align-content:start}
+.label{font-size:12px;letter-spacing:.08em;color:var(--muted);font-weight:700;margin-bottom:4px}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+button{font-family:var(--f-body);font-size:14px;font-weight:700;color:var(--fg);background:var(--btn);border:1px solid var(--line);border-radius:6px;padding:8px 12px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--fg)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button:focus-visible,input:focus-visible{outline:2px solid var(--hero);outline-offset:2px}
+button[aria-pressed="true"]{background:var(--btn-on);color:var(--btn-on-fg);border-color:var(--btn-on)}
+.slider{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;align-items:center}
+.slider label{font-weight:700}
+.slider output{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:14px}
+.slider input{grid-column:1/-1;width:100%}
+dl{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 16px;margin:0}
+dt{color:var(--muted);font-size:13px}
+dd{margin:0;text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.explain{font-size:13.5px;margin:0;padding:10px 12px;border-left:3px solid var(--hero);background:var(--room2);border-radius:0 6px 6px 0}
+.explain code{font-family:var(--f-mono);font-size:12.5px}
+</style>
+
+<div class="wrap">
+  <nav class="steps" aria-label="講義の段階"><a href="index.html">講義の流れ</a><a href="lj-box.html#force" id="navForce">1 力場</a><a href="jump-integrator.html">2 時間積分</a><a href="thermo-room.html">3 温度・圧力</a><a href="lj-box.html#props" id="navProps">4 物性へ</a><a href="molecule.html">＋ 小分子</a><a href="polymer.html">＋ 高分子</a></nav>
+  <header>
+    <h1>LJ粒子の箱</h1>
+    <p id="lead"></p>
+  </header>
+
+  <div class="screen">
+    <canvas id="cv" tabindex="0" aria-label="箱の画面。矢印キーで上下左右に泳ぐ。粒子をクリックで選択"></canvas>
+    <div class="hint">← → ↑ ↓ 泳ぐ（Space でも上へ）／ 粒子をクリックで選ぶ</div>
+    <div class="badge" id="badge">周期境界</div>
+  </div>
+  <div class="pad" aria-label="タッチ操作">
+    <button id="bL" aria-label="左へ移動">◀</button>
+    <button id="bU" aria-label="上へ泳ぐ">▲</button>
+    <button id="bD" aria-label="下へ泳ぐ">▼</button>
+    <button id="bR" aria-label="右へ移動">▶</button>
+  </div>
+
+  <div class="charts">
+    <div class="chart">
+      <div class="head"><span>LJ ポテンシャル U(r)</span><b id="hU">σ = 1, ε = 1</b></div>
+      <canvas id="chU"></canvas>
+    </div>
+    <div class="chart">
+      <div class="head"><span>温度 T</span><b id="hT"></b></div>
+      <canvas id="chT"></canvas>
+    </div>
+    <div class="chart only-props">
+      <div class="head"><span>動径分布関数 g(r)</span><b id="hG"></b></div>
+      <canvas id="chG"></canvas>
+    </div>
+    <div class="chart only-props">
+      <div class="head"><span>平均二乗変位 MSD（傾き ÷ 4 = D）</span><b id="hM"></b></div>
+      <canvas id="chM"></canvas>
+    </div>
+    <div class="chart only-props wide">
+      <div class="head"><span>速さの分布（棒 = シミュレーション、線 = マクスウェル分布）</span><b id="hV"></b></div>
+      <canvas id="chV"></canvas>
+    </div>
+  </div>
+
+  <div class="grid">
+    <section class="card" aria-label="設定">
+      <div>
+        <div class="label">表示する段階</div>
+        <div class="seg" id="stageSeg">
+          <button data-s="force">1 力場（シンプル）</button>
+          <button data-s="props">4 物性へ（g(r)・MSD・冷やし方）</button>
+        </div>
+      </div>
+      <div class="slider">
+        <label for="sEps">LJ の深さ ε（引き合う強さ）</label><output id="oEps"></output>
+        <input type="range" id="sEps" min="0.2" max="2" step="0.05" value="1">
+      </div>
+      <div class="slider">
+        <label for="sSig">LJ の大きさ σ（粒子の直径）</label><output id="oSig"></output>
+        <input type="range" id="sSig" min="0.8" max="1.2" step="0.01" value="1">
+      </div>
+      <div>
+        <div class="label">境界条件</div>
+        <div class="seg" id="bcSeg">
+          <button data-b="pbc">周期境界</button>
+          <button data-b="wall">壁で囲む</button>
+          <button id="bCopy" aria-pressed="false">まわりのコピーを表示</button>
+        </div>
+      </div>
+      <div class="slider">
+        <label for="sT">目標温度 T₀（Langevin）</label><output id="oT"></output>
+        <input type="range" id="sT" min="0.05" max="1.5" step="0.01" value="0.8">
+      </div>
+      <div class="seg" id="phSeg">
+        <button data-t="0.15">冷やす（固体）</button>
+        <button data-t="0.42">中くらい（液体＋気体）</button>
+        <button data-t="1.2">熱する（気体）</button>
+      </div>
+      <div class="only-props">
+        <div class="label">冷やし方（結晶化）— 先に「熱する」で溶かしてから</div>
+        <div class="seg">
+          <button id="bQuench">急冷（一瞬で T₀ = 0.05）</button>
+          <button id="bSlow" aria-pressed="false">ゆっくり冷やす（30 秒）</button>
+        </div>
+      </div>
+      <div>
+        <div class="label">粒子の色</div>
+        <div class="seg" id="colSeg">
+          <button data-c="plain">単色（色なし）</button>
+          <button data-c="speed">速さ</button>
+          <button data-c="orient" class="only-props">結晶の向き</button>
+        </div>
+      </div>
+      <div class="slider">
+        <label for="sN">粒子の数 N</label><output id="oN"></output>
+        <input type="range" id="sN" min="20" max="150" step="1" value="90">
+      </div>
+      <div class="seg">
+        <button id="bPause" aria-pressed="false">一時停止</button>
+        <button id="bStep" disabled>1ステップ進める</button>
+        <button id="bReset">リセット</button>
+      </div>
+    </section>
+
+    <section class="card" aria-label="測定値と説明">
+      <dl>
+        <dt>温度 T</dt><dd id="rT"></dd>
+        <dt>密度 ρ = N / 面積</dt><dd id="rD"></dd>
+        <dt>ポテンシャル U / N</dt><dd id="rU"></dd>
+        <dt class="only-props">拡散係数 D（MSD の傾き ÷ 4）</dt><dd id="rDf" class="only-props"></dd>
+        <dt class="only-props">結晶らしさ ⟨|ψ₆|⟩（まわりが六角形に並ぶ度合い）</dt><dd id="rPsi" class="only-props"></dd>
+        <dt class="only-props">向きのそろい |⟨ψ₆⟩|（1 = 全体が1つの結晶）</dt><dd id="rPsiG" class="only-props"></dd>
+        <dt>選んだ粒子：r_c 内の仲間</dt><dd id="rC"></dd>
+        <dt>選んだ粒子：力 |F|</dt><dd id="rF"></dd>
+        <dt>ステップ数（Δt = 0.005）</dt><dd id="rS"></dd>
+      </dl>
+      <p class="explain" id="explain"></p>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ---------- parameters (reduced LJ units: σ = ε = m = k_B = 1) ----------
+  const LX = 20, LY = 10.5, DT = 0.005, TS = 3;       // TS: τ per real second
+  const LJ_RC = 4 * (0.4 ** 12 - 0.4 ** 6);           // LJ(2.5σ)/ε: the shift that makes U(r_c) = 0
+  let RC = 2.5, RC2 = RC * RC;                        // cutoff follows σ (r_c = 2.5σ)
+  const M_HERO = 20, A_HERO = 1.0, WCA = 2 ** (1 / 6);   // hero = big disk, contact at r = A_HERO + σ/2-ish
+  const THRUST = 3, GAM_H = 0.8, GAMMA = 1.0;   // hero swims freely: no gravity, drag GAM_H
+  const NB = 100, RMAX = 5, DR = RMAX / NB;
+  const NBV = 50, VMAX = 5, DV = VMAX / NBV;           // speed histogram bins
+  const MSD_DT = 0.25, MSD_LEN = 240, FIT_FROM = 2;     // MSD sample every 0.25τ, up to 60τ; fit D from t ≥ 2τ
+  const T_COLD = 0.05, RAMP_TAU = 90;                    // cool to 0.05 (deep enough to freeze grains); slow = 90τ = 30 s on screen
+  const P = { pbc: true, copies: false, T0: 0.8, N: 90, paused: false, color: 'plain', ramp: null, eps: 1, sig: 1 };
+  let stage = 'force';                                 // 'force' = 1 力場 (simple), 'props' = 4 物性へ
+  // pair force & energy for squared distance r2 (r2 is clamped at (0.8σ)² so a deep overlap cannot blow up)
+  function lj(r2) {
+    const s2 = P.sig * P.sig, rr = Math.max(r2, 0.64 * s2), q = s2 / rr, q6 = q * q * q;
+    return { f: 24 * P.eps * q6 * (2 * q6 - 1) / rr, u: 4 * P.eps * q6 * (q6 - 1) - P.eps * LJ_RC };
+  }
+  const ULJ = r => 4 * P.eps * ((P.sig / r) ** 12 - (P.sig / r) ** 6);
+
+  const EXPLAIN = {
+    pbc: '<b>周期境界</b>：右から出た粒子は左から入ってくる（上下も同じ）。箱のまわりに<b>同じ箱が無限に並んでいる</b>のと同じ。端がないので、少ない粒子でも「大きな物質の中」をまねできる。',
+    copies: 'まわりの薄い箱は<b>コピー</b>。中央の箱の粒子が動くと、コピーも全部同じに動く。',
+    wall: '<b>壁で囲む</b>：壁の近くの粒子は片側にしか仲間がいない＝<b>表面だけ特別</b>になる。g(r) が大きい r で 1 より下がるのは、壁の外に相手がいないせい。',
+    pick: '粒子をクリックすると、<b>カットオフ r_c = 2.5σ</b> の円と、力を計算する相手が線で出る。周期境界では相手は<b>一番近いコピー</b>（最小イメージ規約）。線が箱の外へ伸びるのはそのため。',
+    solid: '<b>低温</b>：粒子が井戸（深さ ε）の底にはまって<b>並ぶ</b>＝固体。g(r) にとがったピークが何本も出る。',
+    liquid: '<b>中くらい</b>：かたまり（液体）とバラバラ（気体）が<b>共存</b>。g(r) は最初のピークがはっきり、遠くはなだらか。',
+    gas: '<b>高温</b>：運動エネルギーが井戸の深さ ε より大きく、くっついていられない＝気体。g(r) は 1 に近い。',
+    msd: '<b>MSD</b> = 粒子が出発点からどれだけ離れたか（の2乗の平均）。液体・気体は時間に比例してのびる（2次元では<b>傾き = 4D</b>）。固体はほぼ横ばい＝その場で振動するだけ。',
+    quench: '<b>急冷</b>：一気に冷やすと、あちこちで同時に固まる。向きのそろわない小さな結晶（多結晶）や乱れた構造になりやすい。色を「結晶の向き」にすると、色がまだらになる。粒子が少ないので結果は毎回少し違う（2〜3回くらべるとよい）。',
+    slow: '<b>ゆっくり冷やす</b>（30 秒かけて T₀ = 0.05 まで）：まず液滴ができ、粒子が並び直す時間がある＝大きくそろった結晶に近づく。急冷と<b>「向きのそろい」</b>を比べよう（「結晶らしさ」はどちらも高い＝小さな粒の中ではちゃんと並んでいる）。',
+    orient: '色＝<b>結晶の向き</b>（まわり6個の並びの角度 ψ₆）。同じ色＝同じ向きにそろった結晶の粒。灰色＝並んでいない（液体・気体・境目）。',
+    maxwell: '<b>速さの分布</b>：棒が粒子の速さのヒストグラム、線が理論（2次元のマクスウェル分布 f(v) = (v/T)·exp(−v²/2T)）。温度を上げると山が右に動いて幅が広がる。固体でも液体でも気体でも、速さの分布は<b>温度だけ</b>で決まる（並び方には関係ない）。',
+    lj: '<b>LJ のパラメータ</b>：ε を大きくすると引き合いが強くなり、同じ温度でもかたまりやすい（決め手は温度と ε の比 T/ε）。σ は粒子の大きさで、σ を大きくすると箱がきゅうくつになる。U(r) のグラフがその場で変わる。',
+    paused: '一時停止中。<b>1ステップ</b>＝ ①今の力で速度を半分進める → ②位置を進める → ③新しい位置で力を計算 → ④速度をもう半分（速度ベレ法、「2 時間積分」と同じ）。矢印＝選んだ粒子にかかる力。'
+  };
+
+  // ---------- state ----------
+  let parts = [], hero, Upot = 0, nStep = 0, nSample = 0, sel = -1;
+  let simT = 0, msdT0 = 0, msdHist = [], psiMean = NaN, psiGlobal = NaN, msdWait = 0;
+  const gAcc = new Float64Array(NB), cnt = new Float64Array(NB), histT = [];
+  const vAcc = new Float64Array(NBV), vCnt = new Float64Array(NBV); let nVs = 0, tAvg = 0;
+  const keys = { L: false, R: false, U: false, D: false };
+  const KEYMAP = { ArrowLeft: 'L', a: 'L', ArrowRight: 'R', d: 'R', ArrowUp: 'U', w: 'U', ' ': 'U', ArrowDown: 'D', s: 'D' };
+
+  function gauss() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+  const wrapX = d => d - LX * Math.round(d / LX), wrapY = d => d - LY * Math.round(d / LY);
+  function sep(ax, ay, bx, by) {   // vector a → b (minimum image when periodic)
+    let dx = bx - ax, dy = by - ay;
+    if (P.pbc) { dx = wrapX(dx); dy = wrapY(dy); }
+    return [dx, dy];
+  }
+  function newPart(x, y) { const s = Math.sqrt(P.T0); return { x, y, vx: gauss() * s, vy: gauss() * s, ax: 0, ay: 0, wx: 0, wy: 0, x0: x, y0: y, ps: 0, pa: 0 }; }
+  // unwrapped position = position + number of times it crossed the periodic box
+  const ux = b => b.x + b.wx * LX, uy = b => b.y + b.wy * LY;
+  function resetMSD() {
+    for (const b of parts) { b.x0 = ux(b); b.y0 = uy(b); }
+    msdT0 = simT; msdHist = [{ t: 0, v: 0 }];
+  }
+  function msdNow() {
+    if (!parts.length) return 0;
+    let s = 0; for (const b of parts) s += (ux(b) - b.x0) ** 2 + (uy(b) - b.y0) ** 2;
+    return s / parts.length;
+  }
+  function fitD() {   // least-squares slope of MSD(t) for t ≥ FIT_FROM, D = slope / 4 (2D)
+    const pts = msdHist.filter(p => p.t >= FIT_FROM);
+    if (pts.length < 8) return null;
+    const mt = pts.reduce((a, p) => a + p.t, 0) / pts.length, mv = pts.reduce((a, p) => a + p.v, 0) / pts.length;
+    let sxy = 0, sxx = 0; for (const p of pts) { sxy += (p.t - mt) * (p.v - mv); sxx += (p.t - mt) ** 2; }
+    const slope = sxy / sxx;
+    return { D: slope / 4, slope, b: mv - slope * mt };
+  }
+  // local bond-orientational order ψ₆ = mean of exp(6iθ) over neighbours within 1.5σ
+  function computePsi() {
+    const n = parts.length, re = new Float64Array(n), im = new Float64Array(n), k = new Uint8Array(n);
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+      const [dx, dy] = sep(parts[i].x, parts[i].y, parts[j].x, parts[j].y);
+      if (dx * dx + dy * dy >= 2.25 * P.sig * P.sig) continue;
+      const a = 6 * Math.atan2(dy, dx), c = Math.cos(a), s = Math.sin(a);
+      re[i] += c; im[i] += s; re[j] += c; im[j] += s; k[i]++; k[j]++;   // θ+π gives the same 6θ mod 2π
+    }
+    let sum = 0, sre = 0, sim = 0;
+    parts.forEach((b, i) => {
+      if (k[i] < 3) { b.ps = 0; b.pa = 0; return; }
+      b.ps = Math.hypot(re[i], im[i]) / k[i]; b.pa = Math.atan2(im[i], re[i]);
+      sum += b.ps; sre += re[i] / k[i]; sim += im[i] / k[i];
+    });
+    psiMean = n ? sum / n : NaN;
+    psiGlobal = n ? Math.hypot(sre, sim) / n : NaN;   // only high when all grains point the same way
+  }
+  function nearHero(x, y) { const [dx, dy] = sep(hero.x, hero.y, x, y); return dx * dx + dy * dy < 1.7 * 1.7; }
+
+  function reset() {
+    hero = { x: 3, y: 2, vx: 0, vy: 0, ax: 0, ay: 0, fx: 0, fy: 0, face: 1 };
+    // random subset of a ~1.1σ lattice: no overlaps at start
+    const a0 = 1.1 * Math.max(1, P.sig), nx = Math.floor(LX / a0), ny = Math.floor(LY / a0), sites = [];
+    for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
+      const x = (i + .5) * LX / nx, y = (j + .5) * LY / ny;
+      if (!nearHero(x, y)) sites.push([x, y]);
+    }
+    for (let i = sites.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); [sites[i], sites[k]] = [sites[k], sites[i]]; }
+    parts = sites.slice(0, P.N).map(([x, y]) => newPart(x, y));
+    let mx = 0, my = 0; for (const b of parts) { mx += b.vx; my += b.vy; }
+    for (const b of parts) { b.vx -= mx / parts.length; b.vy -= my / parts.length; }
+    nStep = 0; nSample = 0; sel = -1; gAcc.fill(0); histT.length = 0; P.ramp = null; vAcc.fill(0); nVs = 0;
+    forces(); heroAcc(); resetMSD(); computePsi();
+  }
+  function adjustN() {
+    while (parts.length > P.N) parts.pop();
+    let tries = 0;
+    while (parts.length < P.N && tries < 4000) {
+      tries++;
+      const x = Math.random() * LX, y = Math.random() * LY;
+      if (nearHero(x, y)) continue;
+      if (parts.some(b => { const [dx, dy] = sep(b.x, b.y, x, y); return dx * dx + dy * dy < 1.0; })) continue;
+      parts.push(newPart(x, y));
+    }
+    if (sel >= parts.length) sel = -1;
+    nSample = 0; forces(); resetMSD();
+  }
+
+  function temperature() {
+    if (!parts.length) return 0;
+    let k = 0; for (const b of parts) k += b.vx * b.vx + b.vy * b.vy;
+    return 0.5 * k / parts.length; // 2D: <½mv²> = kT
+  }
+
+  // ---------- physics ----------
+  function forces() {
+    let U = 0;
+    for (const b of parts) { b.ax = 0; b.ay = 0; }
+    hero.fx = 0; hero.fy = 0;
+    const n = parts.length;
+    for (let i = 0; i < n; i++) {
+      const a = parts[i];
+      for (let j = i + 1; j < n; j++) {
+        const c = parts[j];
+        let dx = c.x - a.x, dy = c.y - a.y;
+        if (P.pbc) { dx = wrapX(dx); dy = wrapY(dy); }
+        if (dx > RC || dx < -RC) continue;
+        const r2 = dx * dx + dy * dy;
+        if (r2 >= RC2) continue;
+        const p = lj(r2);                      // p.f = |F|/r, positive = repulsive
+        a.ax -= p.f * dx; a.ay -= p.f * dy; c.ax += p.f * dx; c.ay += p.f * dy;
+        U += p.u;
+      }
+      // particle ↔ hero: purely repulsive LJ (WCA), shifted out by the hero's radius
+      const [dx, dy] = sep(hero.x, hero.y, a.x, a.y);
+      const r = Math.hypot(dx, dy), s = r - A_HERO;
+      if (s < WCA && r > 1e-9) {
+        const ss = Math.max(s, 0.75), i6 = ss ** -6;
+        const f = 24 * i6 * (2 * i6 - 1) / ss / r;
+        a.ax += f * dx; a.ay += f * dy; hero.fx -= f * dx; hero.fy -= f * dy;
+      }
+    }
+    Upot = U;
+  }
+  function heroAcc() {
+    const input = (keys.R ? 1 : 0) - (keys.L ? 1 : 0);
+    hero.ax = input * THRUST - GAM_H * hero.vx + hero.fx / M_HERO;
+    hero.ay = ((keys.U ? 1 : 0) - (keys.D ? 1 : 0)) * THRUST - GAM_H * hero.vy + hero.fy / M_HERO;
+  }
+  function boundary(o, r) {
+    if (P.pbc) {
+      const kx = Math.floor(o.x / LX), ky = Math.floor(o.y / LY);
+      if (kx || ky) { o.x -= LX * kx; o.y -= LY * ky; o.wx = (o.wx || 0) + kx; o.wy = (o.wy || 0) + ky; }
+      return;
+    }
+    if (o.x < r) { o.x = r; o.vx = Math.abs(o.vx); }
+    if (o.x > LX - r) { o.x = LX - r; o.vx = -Math.abs(o.vx); }
+    if (o.y < r) { o.y = r; o.vy = Math.abs(o.vy); }
+    if (o.y > LY - r) { o.y = LY - r; o.vy = -Math.abs(o.vy); }
+  }
+
+  // velocity Verlet for everything, then Langevin kick on the particles
+  function step() {
+    const dt = DT, h = dt / 2;
+    for (const b of parts) { b.vx += b.ax * h; b.vy += b.ay * h; b.x += b.vx * dt; b.y += b.vy * dt; boundary(b, P.sig / 2); }
+    hero.vx += hero.ax * h; hero.vy += hero.ay * h; hero.x += hero.vx * dt; hero.y += hero.vy * dt;
+    boundary(hero, A_HERO);
+    forces(); heroAcc();
+    for (const b of parts) { b.vx += b.ax * h; b.vy += b.ay * h; }
+    hero.vx += hero.ax * h; hero.vy += hero.ay * h;
+    const s = Math.sqrt(2 * GAMMA * P.T0 * dt), f = 1 - GAMMA * dt;
+    for (const b of parts) { b.vx = b.vx * f + s * gauss(); b.vy = b.vy * f + s * gauss(); }
+    if (Math.abs(hero.vx) > 0.1) hero.face = Math.sign(hero.vx);
+    nStep++; simT += dt;
+    if (nStep % 5 === 0) { sampleG(); sampleV(); }
+    if (P.ramp) {
+      const u = Math.min(1, (simT - P.ramp.t0) / RAMP_TAU);
+      P.T0 = P.ramp.from + (T_COLD - P.ramp.from) * u;
+      if (u >= 1) { P.ramp = null; resetMSD(); }   // measure D of the cooled state only
+    }
+    if (msdWait && simT >= msdWait && !P.ramp) { msdWait = 0; resetMSD(); }
+    const tm = simT - msdT0, lastM = msdHist[msdHist.length - 1];
+    if (msdHist.length < MSD_LEN && tm - lastM.t >= MSD_DT - 1e-9) msdHist.push({ t: tm, v: msdNow() });
+  }
+
+  function sampleG() {
+    const n = parts.length; if (n < 2) return;
+    cnt.fill(0);
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+      const [dx, dy] = sep(parts[i].x, parts[i].y, parts[j].x, parts[j].y);
+      const r2 = dx * dx + dy * dy;
+      if (r2 < RMAX * RMAX) cnt[Math.floor(Math.sqrt(r2) / DR)]++;
+    }
+    const rho = n / (LX * LY), a = Math.max(0.01, 1 / ++nSample);
+    for (let k = 0; k < NB; k++) {
+      const r = (k + .5) * DR, inst = 2 * cnt[k] / (n * rho * 2 * Math.PI * r * DR);
+      gAcc[k] += (inst - gAcc[k]) * a;
+    }
+  }
+
+  // speed histogram as a probability density, averaged over the last ~1τ (adapts when T changes)
+  function sampleV() {
+    const n = parts.length; if (!n) return;
+    vCnt.fill(0); let k2 = 0;
+    for (const b of parts) { const v2 = b.vx * b.vx + b.vy * b.vy; k2 += v2; const k = Math.floor(Math.sqrt(v2) / DV); if (k < NBV) vCnt[k]++; }
+    const a = Math.max(0.025, 1 / ++nVs);
+    for (let k = 0; k < NBV; k++) vAcc[k] += (vCnt[k] / (n * DV) - vAcc[k]) * a;
+    tAvg += (0.5 * k2 / n - tAvg) * a;   // the temperature the histogram corresponds to
+  }
+  const maxwell2D = (v, T) => v / T * Math.exp(-v * v / (2 * T));   // m = k_B = 1
+
+  function selInfo() {
+    if (sel < 0) return null;
+    const a = parts[sel], nb = []; let fx = 0, fy = 0;
+    parts.forEach((c, j) => {
+      if (j === sel) return;
+      const [dx, dy] = sep(a.x, a.y, c.x, c.y), r2 = dx * dx + dy * dy;
+      if (r2 >= RC2) return;
+      const f = lj(r2).f;
+      fx -= f * dx; fy -= f * dy; nb.push({ dx, dy, r: Math.sqrt(r2) });
+    });
+    return { a, nb, fx, fy };
+  }
+
+  // ---------- loop ----------
+  let acc = 0, last = performance.now(), lastSample = 0, lastUI = 0;
+  function frame(now) {
+    const real = Math.min(0.05, (now - last) / 1000); last = now;
+    if (!P.paused) {
+      acc += real * TS;
+      while (acc >= DT) { step(); acc -= DT; }
+      if (now - lastSample >= 100) {
+        lastSample = now; histT.push(temperature());
+        if (histT.length > 200) histT.shift();
+      }
+    } else { acc = 0; heroAcc(); }
+    draw();
+    if (now - lastUI > 150) { updateUI(); drawCharts(); lastUI = now; }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- drawing ----------
+  const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  let cw = 0, ch = 0, S = 1, ox = 0, oy = 0;
+  function fit(c, g) {
+    const r = c.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr);
+    g.setTransform(dpr, 0, 0, dpr, 0, 0); return r;
+  }
+  new ResizeObserver(() => { const r = fit(cv, ctx); cw = r.width; ch = r.height; }).observe(cv);
+
+  let C = {};
+  function readColors() {
+    const cs = getComputedStyle(document.documentElement);
+    for (const k of ['room','room2','grid','wall','hero','target','line1','line2','fg','muted','panel','part'])
+      C[k] = cs.getPropertyValue('--' + k).trim();
+  }
+  readColors();
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+  new MutationObserver(readColors).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+  const showCopies = () => P.copies && P.pbc;
+  function view() { const k = showCopies() ? 3 : 1; S = cw / (k * LX); ox = k === 3 ? LX : 0; oy = k === 3 ? LY : 0; }
+  const X = x => (x + ox) * S, Y = y => ch - (y + oy) * S;
+  function tiles() {
+    if (!P.pbc) return [[0, 0]];
+    const t = []; for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) t.push([i, j]); return t;
+  }
+
+  function draw() {
+    if (!cw) return;
+    view();
+    ctx.fillStyle = C.room2; ctx.fillRect(0, 0, cw, ch);
+    ctx.fillStyle = C.room; ctx.fillRect(X(0), Y(LY), LX * S, LY * S);
+    ctx.strokeStyle = C.grid; ctx.lineWidth = 1;
+    for (let m = 1; m < LX; m++) { const x = Math.round(X(m)) + .5; ctx.beginPath(); ctx.moveTo(x, Y(LY)); ctx.lineTo(x, Y(0)); ctx.stroke(); }
+    for (let m = 1; m < LY; m++) { const y = Math.round(Y(m)) + .5; ctx.beginPath(); ctx.moveTo(X(0), y); ctx.lineTo(X(LX), y); ctx.stroke(); }
+
+    const vref = Math.sqrt(2 * Math.max(P.T0, 0.3)) * 1.6;
+    for (const [ix, iy] of tiles()) {
+      ctx.globalAlpha = showCopies() && (ix || iy) ? 0.35 : 1;
+      const sx = ix * LX, sy = iy * LY;
+      for (const b of parts) {
+        if (P.color === 'orient') ctx.fillStyle = b.ps < 0.6 ? C.muted : `hsl(${(b.pa + Math.PI) / (2 * Math.PI) * 360} 70% 52%)`;
+        else if (P.color === 'speed') { const t = Math.min(1, Math.hypot(b.vx, b.vy) / vref); ctx.fillStyle = `hsl(${215 - 215 * t} 75% 52%)`; }
+        else ctx.fillStyle = C.part;
+        ctx.beginPath(); ctx.arc(X(b.x + sx), Y(b.y + sy), 0.47 * P.sig * S, 0, Math.PI * 2); ctx.fill();
+      }
+      drawHero(sx, sy);
+    }
+    ctx.globalAlpha = 1;
+
+    // box edges: solid wall, or a dashed "imaginary" edge for periodic
+    if (P.pbc) {
+      ctx.save(); ctx.setLineDash([8, 6]); ctx.strokeStyle = C.fg; ctx.lineWidth = 2;
+      ctx.strokeRect(X(0), Y(LY), LX * S, LY * S); ctx.restore();
+    } else {
+      ctx.strokeStyle = C.wall; ctx.lineWidth = Math.max(6, S * .2);
+      ctx.strokeRect(0, 0, cw, ch);
+    }
+
+    const info = selInfo();
+    if (info) {
+      for (const [ix, iy] of tiles()) {
+        ctx.globalAlpha = showCopies() && (ix || iy) ? 0.35 : 1;
+        const px = X(info.a.x + ix * LX), py = Y(info.a.y + iy * LY);
+        ctx.strokeStyle = C.target; ctx.lineWidth = 1.5;
+        ctx.save(); ctx.setLineDash([5, 4]);
+        ctx.beginPath(); ctx.arc(px, py, RC * S, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+        ctx.lineWidth = 1.2;
+        for (const q of info.nb) { ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + q.dx * S, py - q.dy * S); ctx.stroke(); }
+        ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(px, py, 0.55 * P.sig * S, 0, Math.PI * 2); ctx.stroke();
+        // force arrow (length ∝ |F|, capped)
+        const fm = Math.hypot(info.fx, info.fy);
+        if (fm > 1e-3) {
+          const len = Math.min(3, fm * 0.25), ux = info.fx / fm, uy = info.fy / fm;
+          const ex = px + ux * len * S, ey = py - uy * len * S, hd = Math.max(6, S * .25);
+          ctx.strokeStyle = C.fg; ctx.fillStyle = C.fg; ctx.lineWidth = Math.max(2, S * .08);
+          ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(ex, ey); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(ex, ey);
+          ctx.lineTo(ex - hd * (ux * .9 - uy * .5), ey + hd * (uy * .9 + ux * .5));
+          ctx.lineTo(ex - hd * (ux * .9 + uy * .5), ey + hd * (uy * .9 - ux * .5));
+          ctx.closePath(); ctx.fill();
+        }
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+  function drawHero(sx, sy) {
+    const half = A_HERO * 0.95, x = X(hero.x + sx - half), y = Y(hero.y + sy + half), w = 2 * half * S, h = w;
+    if (x > cw || y > ch || x + w < 0 || y + h < 0) return;
+    ctx.fillStyle = C.hero; ctx.strokeStyle = C.fg; ctx.lineWidth = Math.max(1.5, S * .06);
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, w * .32); ctx.fill(); ctx.stroke();
+    const ex = x + w * (hero.face > 0 ? .58 : .22), ey = y + h * .32;
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(ex, ey, w * .14, h * .24); ctx.fillRect(ex + w * .2, ey, w * .14, h * .24);
+    ctx.fillStyle = '#111111'; const px = hero.face > 0 ? w * .06 : 0, py = hero.vy > .5 ? 0 : h * .1;
+    ctx.fillRect(ex + px, ey + py, w * .08, h * .12); ctx.fillRect(ex + w * .2 + px, ey + py, w * .08, h * .12);
+  }
+
+  // charts
+  const chU = document.getElementById('chU'), gU = chU.getContext('2d');
+  const chG = document.getElementById('chG'), gG = chG.getContext('2d');
+  const chT = document.getElementById('chT'), gT = chT.getContext('2d');
+  const chM = document.getElementById('chM'), gM = chM.getContext('2d');
+  let rU = { width: 0 }, rG = { width: 0 }, rT = { width: 0 }, rM = { width: 0 };
+  const chV = document.getElementById('chV'), gV = chV.getContext('2d');
+  let rV = { width: 0 };
+  const ro = new ResizeObserver(() => { rU = fit(chU, gU); rG = fit(chG, gG); rT = fit(chT, gT); rM = fit(chM, gM); rV = fit(chV, gV); drawCharts(); });
+  for (const c of [chU, chG, chT, chM, chV]) ro.observe(c);   // g(r), MSD and speeds appear only in 4 物性へ
+
+  // shared axes: returns coordinate mappers
+  function axes(g, r, x0, x1, y0, y1, yticks, xticks, xfmt) {
+    const w = r.width, h = r.height, L = 34, B = 18, T = 6, Rp = 6;
+    g.clearRect(0, 0, w, h);
+    const xv = v => L + (w - L - Rp) * (v - x0) / (x1 - x0), yv = v => T + (h - T - B) * (y1 - v) / (y1 - y0);
+    g.strokeStyle = C.grid; g.fillStyle = C.muted; g.lineWidth = 1;
+    g.font = '11px "JetBrains Mono", monospace'; g.textBaseline = 'middle'; g.textAlign = 'right';
+    for (const v of yticks) { const y = Math.round(yv(v)) + .5; g.beginPath(); g.moveTo(L, y); g.lineTo(w - Rp, y); g.stroke(); g.fillText(String(v), L - 4, y); }
+    g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+    for (const v of xticks) g.fillText(xfmt(v), xv(v), h - 3);
+    return { xv, yv, w, h, L, Rp };
+  }
+  function drawU(info) {
+    if (!rU.width) return;
+    // fixed axes (r in units of the default σ = 1, U in units of the default ε = 1) so slider changes are visible
+    const x0 = 0.7, x1 = 3.2, y0 = -2.2, y1 = 1.6;
+    const g = gU, A = axes(g, rU, x0, x1, y0, y1, [-2, -1, 0, 1], [1, 1.5, 2, 2.5, 3], v => 'r=' + v);
+    g.strokeStyle = C.muted; g.lineWidth = 1; g.beginPath(); g.moveTo(A.L, A.yv(0)); g.lineTo(A.w - A.Rp, A.yv(0)); g.stroke();
+    // cutoff
+    g.save(); g.setLineDash([4, 4]); g.strokeStyle = C.target; g.beginPath(); g.moveTo(A.xv(RC), A.yv(y1)); g.lineTo(A.xv(RC), A.yv(y0)); g.stroke(); g.restore();
+    g.fillStyle = C.target; g.textAlign = 'left'; g.fillText('r_c = 2.5σ', Math.min(A.xv(RC) + 3, A.w - 70), A.yv(1.2));
+    g.strokeStyle = C.line1; g.lineWidth = 2; g.beginPath();
+    for (let i = 0; i <= 240; i++) { const r = x0 + (x1 - x0) * i / 240, u = Math.max(y0, Math.min(y1, ULJ(r))); i ? g.lineTo(A.xv(r), A.yv(u)) : g.moveTo(A.xv(r), A.yv(u)); }
+    g.stroke();
+    // well bottom: depth ε at r = 2^(1/6) σ
+    const rm = WCA * P.sig; g.fillStyle = C.fg; g.beginPath(); g.arc(A.xv(rm), A.yv(-P.eps), 3, 0, Math.PI * 2); g.fill();
+    g.fillText('底 −ε（r = 1.12σ）', A.xv(rm) + 6, A.yv(-P.eps) + (P.eps > 1.7 ? -8 : 12));
+    g.fillText('← 反発', A.xv(P.sig * 1.02), A.yv(1.25));
+    if (info) {
+      g.fillStyle = C.target;
+      for (const q of info.nb) { g.beginPath(); g.arc(A.xv(Math.max(x0, q.r)), A.yv(Math.max(y0, Math.min(y1, ULJ(q.r)))), 3.5, 0, Math.PI * 2); g.fill(); }
+    }
+  }
+  function drawG() {
+    if (!rG.width) return;
+    let gmax = 3; for (const v of gAcc) gmax = Math.max(gmax, Math.ceil(v));
+    gmax = Math.min(gmax, 12);
+    const yt = []; const st = gmax > 6 ? 2 : 1; for (let v = 0; v <= gmax; v += st) yt.push(v);
+    const g = gG, A = axes(g, rG, 0, RMAX, 0, gmax, yt, [0, 1, 2, 3, 4, 5], v => v + 'σ');
+    g.save(); g.setLineDash([5, 4]); g.strokeStyle = C.target; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(A.L, A.yv(1)); g.lineTo(A.w - A.Rp, A.yv(1)); g.stroke(); g.restore();
+    g.strokeStyle = C.line2; g.lineWidth = 2; g.beginPath();
+    for (let k = 0; k < NB; k++) { const x = A.xv((k + .5) * DR), y = A.yv(Math.min(gmax, gAcc[k])); k ? g.lineTo(x, y) : g.moveTo(x, y); }
+    g.stroke();
+  }
+  function drawT() {
+    if (!rT.width) return;
+    const tmax = Math.max(0.5, Math.ceil(Math.max(P.T0 * 1.5, ...histT) * 2) / 2);
+    const yt = [0, tmax / 2, tmax].map(v => +v.toFixed(2));
+    const g = gT, A = axes(g, rT, 0, 199, 0, tmax, yt, [], () => '');
+    g.fillStyle = C.muted; g.textAlign = 'left'; g.fillText('過去 20 s', A.L + 2, A.h - 3);
+    g.save(); g.setLineDash([5, 4]); g.strokeStyle = C.target; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(A.L, A.yv(P.T0)); g.lineTo(A.w - A.Rp, A.yv(P.T0)); g.stroke(); g.restore();
+    g.strokeStyle = C.line1; g.lineWidth = 2; g.beginPath();
+    histT.forEach((v, i) => { const x = A.xv(i), y = A.yv(Math.min(v, tmax)); i ? g.lineTo(x, y) : g.moveTo(x, y); });
+    g.stroke();
+  }
+  function niceMax(v) { const e = 10 ** Math.floor(Math.log10(v)); for (const m of [1, 2, 5, 10]) if (m * e >= v) return m * e; return 10 * e; }
+  function drawM() {
+    if (!rM.width) return;
+    const tEnd = MSD_DT * (MSD_LEN - 1), mmax = niceMax(Math.max(1, ...msdHist.map(p => p.v)) * 1.1);
+    const g = gM, A = axes(g, rM, 0, tEnd, 0, mmax, [0, mmax / 2, mmax], [0, 20, 40, 60], v => v + 'τ');
+    const fit = fitD();
+    if (fit) {
+      g.save(); g.setLineDash([5, 4]); g.strokeStyle = C.target; g.lineWidth = 1.5; g.beginPath();
+      const t1 = Math.min(tEnd, Math.max(FIT_FROM + 1, (mmax - fit.b) / Math.max(fit.slope, 1e-9)));
+      g.moveTo(A.xv(FIT_FROM), A.yv(Math.max(0, fit.slope * FIT_FROM + fit.b))); g.lineTo(A.xv(t1), A.yv(Math.min(mmax, fit.slope * t1 + fit.b)));
+      g.stroke(); g.restore();
+    }
+    g.strokeStyle = C.line1; g.lineWidth = 2; g.beginPath();
+    msdHist.forEach((p, i) => { const x = A.xv(p.t), y = A.yv(Math.min(mmax, p.v)); i ? g.lineTo(x, y) : g.moveTo(x, y); });
+    g.stroke();
+    if (msdHist.length >= MSD_LEN) { g.fillStyle = C.muted; g.textAlign = 'right'; g.fillText('60τ で測定終了（条件を変えると再開）', A.w - A.Rp, A.yv(mmax) + 12); }
+  }
+  function drawV() {
+    if (!rV.width) return;
+    const T = Math.max(tAvg, 0.01);
+    let ymax = 0.5; for (const v of vAcc) ymax = Math.max(ymax, v); ymax = Math.max(ymax, maxwell2D(Math.sqrt(T), T));
+    ymax = Math.ceil(ymax * 1.15 * 10) / 10;
+    const g = gV, A = axes(g, rV, 0, VMAX, 0, ymax, [0, +(ymax / 2).toFixed(2), ymax], [0, 1, 2, 3, 4, 5], v => 'v=' + v);
+    g.fillStyle = C.line2; g.globalAlpha = 0.45;
+    const bw = A.xv(DV) - A.xv(0);
+    for (let k = 0; k < NBV; k++) { const y = A.yv(Math.min(ymax, vAcc[k])); g.fillRect(A.xv(k * DV) + 0.5, y, Math.max(1, bw - 1), A.yv(0) - y); }
+    g.globalAlpha = 1;
+    g.strokeStyle = C.target; g.lineWidth = 2; g.beginPath();
+    for (let i = 0; i <= 200; i++) { const v = VMAX * i / 200, y = A.yv(Math.min(ymax, maxwell2D(v, T))); i ? g.lineTo(A.xv(v), y) : g.moveTo(A.xv(v), y); }
+    g.stroke();
+    // most probable speed √T (2D)
+    const vp = Math.sqrt(T);
+    g.save(); g.setLineDash([4, 4]); g.strokeStyle = C.muted; g.beginPath(); g.moveTo(A.xv(vp), A.yv(0)); g.lineTo(A.xv(vp), A.yv(ymax)); g.stroke(); g.restore();
+    g.fillStyle = C.muted; g.textAlign = 'left'; g.fillText('いちばん多い速さ √T', Math.min(A.xv(vp) + 4, A.w - 120), A.yv(ymax) + 10);
+  }
+  function drawCharts() { drawU(selInfo()); drawG(); drawT(); drawM(); drawV(); }
+
+  // ---------- UI (readouts refresh every 150 ms) ----------
+  const $ = id => document.getElementById(id);
+  function updateUI() {
+    const T = temperature(), info = selInfo();
+    let gpk = 0; for (const v of gAcc) gpk = Math.max(gpk, v);
+    $('rT').textContent = T.toFixed(3);
+    $('rD').textContent = (parts.length / (LX * LY)).toFixed(3);
+    $('rU').textContent = parts.length ? (Upot / parts.length).toFixed(3) : '—';
+    $('rC').textContent = info ? info.nb.length + ' 個' : '—';
+    $('rF').textContent = info ? Math.hypot(info.fx, info.fy).toFixed(2) : '—';
+    $('rS').textContent = nStep.toLocaleString();
+    $('hT').textContent = 'T = ' + T.toFixed(2);
+    $('hG').textContent = '最大 ' + gpk.toFixed(2);
+    computePsi();
+    const fit = fitD();
+    $('rDf').textContent = fit ? Math.max(0, fit.D).toFixed(3) : '測定中';
+    $('rPsi').textContent = isFinite(psiMean) ? psiMean.toFixed(2) : '—';
+    $('rPsiG').textContent = isFinite(psiGlobal) ? psiGlobal.toFixed(2) : '—';
+    $('hM').textContent = fit ? 'D = ' + Math.max(0, fit.D).toFixed(3) : '';
+    $('hV').textContent = 'T = ' + tAvg.toFixed(2) + '、いちばん多い速さ ' + Math.sqrt(Math.max(tAvg, 0)).toFixed(2);
+    if (P.ramp || rampSync) { rampSync = !!P.ramp; syncUI(); }
+  }
+  let rampSync = false, lastCool = null;
+  // any manual temperature change: stop the ramp and restart the MSD clock
+  // MSD restarts 3τ later, after the temperature has settled
+  function setT0(t) { P.T0 = t; P.ramp = null; lastCool = null; nSample = 0; resetMSD(); msdWait = simT + 3; syncUI(); }
+  function syncUI() {
+    $('oT').textContent = P.T0.toFixed(2); $('oN').textContent = P.N;
+    $('sT').value = P.T0; $('oEps').textContent = P.eps.toFixed(2); $('oSig').textContent = P.sig.toFixed(2);
+    $('hU').textContent = 'σ = ' + P.sig.toFixed(2) + ', ε = ' + P.eps.toFixed(2);
+    document.querySelectorAll('#stageSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.s === stage)));
+    $('navForce').toggleAttribute('aria-current', stage === 'force'); $('navProps').toggleAttribute('aria-current', stage === 'props');
+    $('lead').textContent = stage === 'force'
+      ? '粒子は Lennard-Jones 力で引き合う。ε と σ を変えて、力の形と粒子のかたまり方を見る。'
+      : '温度・冷やし方・境界条件を変えて、構造（g(r)）・拡散（MSD）・結晶化を測る。';
+    document.querySelectorAll('#bcSeg [data-b]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.b === 'pbc') === P.pbc)));
+    $('bCopy').disabled = !P.pbc; $('bCopy').setAttribute('aria-pressed', String(showCopies()));
+    document.querySelectorAll('#phSeg button').forEach(b => b.setAttribute('aria-pressed', String(!P.ramp && !lastCool && Math.abs(+b.dataset.t - P.T0) < 1e-6)));
+    $('bSlow').setAttribute('aria-pressed', String(!!P.ramp));
+    $('bSlow').textContent = P.ramp ? `ゆっくり冷やす中… 残り ${Math.ceil((RAMP_TAU - (simT - P.ramp.t0)) / TS)} 秒` : 'ゆっくり冷やす（30 秒）';
+    $('bQuench').setAttribute('aria-pressed', String(lastCool === 'quench'));
+    document.querySelectorAll('#colSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.c === P.color)));
+    $('bPause').setAttribute('aria-pressed', String(P.paused)); $('bPause').textContent = P.paused ? '再開' : '一時停止';
+    $('bStep').disabled = !P.paused;
+    $('badge').textContent = (P.pbc ? '周期境界' : '壁') + ' · T₀ = ' + P.T0.toFixed(2);
+    let ex = P.paused ? EXPLAIN.paused : P.pbc ? EXPLAIN.pbc + (showCopies() ? '<br>' + EXPLAIN.copies : '') : EXPLAIN.wall;
+    const tr = P.T0 / P.eps;                 // what matters is temperature relative to the well depth
+    ex += '<br>' + (lastCool && stage === 'props' ? EXPLAIN[lastCool] : tr < 0.3 ? EXPLAIN.solid : tr < 0.6 ? EXPLAIN.liquid : EXPLAIN.gas);
+    if (stage === 'force') ex += '<br>' + EXPLAIN.lj;
+    else { if (P.color === 'orient') ex += '<br>' + EXPLAIN.orient; ex += '<br>' + EXPLAIN.msd + '<br>' + EXPLAIN.maxwell; }
+    if (sel < 0) ex += '<br>' + EXPLAIN.pick;
+    $('explain').innerHTML = ex;
+  }
+  function setBC(pbc) {
+    if (P.pbc === pbc) return;
+    P.pbc = pbc; nSample = 0;
+    for (const b of parts) boundary(b, P.sig / 2);
+    boundary(hero, A_HERO); forces(); resetMSD(); syncUI();
+  }
+  document.querySelectorAll('#bcSeg [data-b]').forEach(b => b.addEventListener('click', () => setBC(b.dataset.b === 'pbc')));
+  $('bCopy').addEventListener('click', () => { P.copies = !P.copies; syncUI(); });
+  document.querySelectorAll('#phSeg button').forEach(b => b.addEventListener('click', () => setT0(+b.dataset.t)));
+  $('sT').addEventListener('input', e => setT0(+e.target.value));
+  $('bQuench').addEventListener('click', () => { setT0(T_COLD); lastCool = 'quench'; syncUI(); });
+  $('bSlow').addEventListener('click', () => {
+    if (P.ramp) { setT0(P.T0); return; }   // second click stops the ramp where it is
+    const from = P.T0; setT0(from); P.ramp = { t0: simT, from }; lastCool = 'slow'; syncUI();
+  });
+  document.querySelectorAll('#colSeg button').forEach(b => b.addEventListener('click', () => { P.color = b.dataset.c; syncUI(); }));
+  $('sEps').addEventListener('input', e => { P.eps = +e.target.value; forces(); nSample = 0; syncUI(); drawCharts(); });
+  $('sSig').addEventListener('input', e => { P.sig = +e.target.value; RC = 2.5 * P.sig; RC2 = RC * RC; forces(); nSample = 0; syncUI(); drawCharts(); });
+  function setStage(s) {
+    stage = s === 'props' ? 'props' : 'force';
+    document.body.dataset.stage = stage;
+    if (stage === 'force' && P.color === 'orient') P.color = 'plain';
+    syncUI(); drawCharts();
+  }
+  document.querySelectorAll('#stageSeg button').forEach(b => b.addEventListener('click', () => {
+    try { history.replaceState(null, '', '#' + b.dataset.s); } catch (e) {}
+    setStage(b.dataset.s);
+  }));
+  addEventListener('hashchange', () => setStage(location.hash.slice(1)));
+  $('sN').addEventListener('input', e => { P.N = +e.target.value; adjustN(); syncUI(); });
+  $('bPause').addEventListener('click', () => { P.paused = !P.paused; syncUI(); });
+  $('bStep').addEventListener('click', () => { step(); updateUI(); drawCharts(); });
+  $('bReset').addEventListener('click', () => { reset(); lastCool = null; syncUI(); });
+
+  // click / tap on the box: pick the nearest particle (any copy counts)
+  cv.addEventListener('pointerdown', e => {
+    cv.focus(); view();
+    const r = cv.getBoundingClientRect();
+    let x = (e.clientX - r.left) / S - ox, y = (ch - (e.clientY - r.top)) / S - oy;
+    let best = -1, bd = 0.8 * 0.8;
+    parts.forEach((b, i) => { const [dx, dy] = sep(x, y, b.x, b.y), d2 = dx * dx + dy * dy; if (d2 < bd) { bd = d2; best = i; } });
+    sel = best; syncUI(); drawCharts();
+  });
+
+  addEventListener('keydown', e => {
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (tag === 'INPUT' && e.key.startsWith('Arrow')) return;
+    if (tag === 'BUTTON' && e.key === ' ') return;
+    const k = KEYMAP[e.key];
+    if (k) { keys[k] = true; e.preventDefault(); }
+  });
+  addEventListener('keyup', e => { const k = KEYMAP[e.key]; if (k) keys[k] = false; });
+  function hold(id, k) {
+    const el = $(id);
+    el.addEventListener('pointerdown', e => { keys[k] = true; el.setPointerCapture(e.pointerId); });
+    for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) el.addEventListener(t, () => keys[k] = false);
+  }
+  hold('bL', 'L'); hold('bR', 'R'); hold('bU', 'U'); hold('bD', 'D');
+
+  reset(); setStage(location.hash.slice(1));
+  requestAnimationFrame(frame);
+})();
+</script>
+
+</html>
